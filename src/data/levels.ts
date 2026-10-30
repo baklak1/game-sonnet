@@ -7,7 +7,7 @@ export interface WaveGroupDef {
   n: number;
   dir: string;
   every?: number;    // хв між пусками в групі
-  target?: string;   // id обʼєкта
+  target?: string;   // id об’єкта
 }
 
 export interface WaveDef {
@@ -206,7 +206,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'c7', num: 7, title: 'Спека', period: 'Липень 2024',
     brief: 'Літо після знищення великих станцій. Спека вмикає кондиціонери, імпорт обмежений, а графіки по 16 годин стають звичними. Сонячні станції працюють на повну, але тільки вдень.',
-    mech: ['Спека: попит росте від кондиціонерів', 'Сонячні станції дешеві та безкоштовні в роботі', 'Ворог бʼє по кільцю 330 кВ і ПС 750'],
+    mech: ['Спека: попит росте від кондиціонерів', 'Сонячні станції дешеві та безкоштовні в роботі', 'Ворог б’є по кільцю 330 кВ і ПС 750'],
     season: 'summer', baseTemp: 29, days: 8, money: 230, staff: 55, crews: [5, 3, 2], transformers: 4, importBase: 350,
     stock: { manpads: 12, gepard: 120, nasams: 16, patriot: 12, irist: 16 },
     defs: [['mfg', 326, 140], ['mfg', 372, 256], ['mfg', 420, 150], ['mfg', 250, 200], ['gepard', 410, 225], ['gepard', 340, 110], ['nasams', 300, 200], ['patriot', 330, 230], ['irist', 380, 280]],
@@ -247,7 +247,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'c9', num: 9, title: 'Облога світла', period: 'Зима 2025–2026',
-    brief: 'Найважча зима. 27 грудня ворог одночасно бʼє по ТЕЦ-5, ТЕЦ-6, Дарницькій ТЕЦ і Київській ГЕС. 9 січня — знову по ТЕЦ, 3 лютого — по Дарницькій. Мороз до −20. Завдання одне: не дати Києву зануритися в повну темряву.',
+    brief: 'Найважча зима. 27 грудня ворог одночасно б’є по ТЕЦ-5, ТЕЦ-6, Дарницькій ТЕЦ і Київській ГЕС. 9 січня — знову по ТЕЦ, 3 лютого — по Дарницькій. Мороз до −20. Завдання одне: не дати Києву зануритися в повну темряву.',
     mech: ['Усі загрози, включно з «Цирконом»', 'Сценарні масовані удари по ТЕЦ', 'Без тепла довіра тане швидко — котельні й КГУ рятують'],
     season: 'winter', baseTemp: -9, days: 14, money: 300, staff: 65, crews: [6, 4, 3], transformers: 5, importBase: 400,
     stock: { manpads: 16, gepard: 200, nasams: 16, patriot: 16, irist: 20, interceptor: 60 },
@@ -338,7 +338,7 @@ export const ENDLESS_UNLOCKS: { wave: number; threats?: ThreatType[]; defs?: Def
   { wave: 6, threats: ['iskander', 'jet'], defs: ['patriot'], text: 'Балістика й реактивні шахеди. Доступний Patriot.' },
   { wave: 8, prot: 3, techs: ['identify', 'mobilesub', 'airforce', 'interceptor2', 'decentral'], text: 'Відкрито Р3 і нові технології.' },
   { wave: 9, threats: ['kinzhal'], text: 'Ворог застосовує «Кинджали».' },
-  { wave: 14, threats: ['zircon'], text: 'Зʼявилися «Циркони».' },
+  { wave: 14, threats: ['zircon'], text: 'З’явилися «Циркони».' },
 ];
 
 export function levelById(id: string): LevelDef {

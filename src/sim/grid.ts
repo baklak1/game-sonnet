@@ -20,7 +20,7 @@ export class FlowNet {
     this.adj[v].push(b);
     return a;
   }
-  /** Штовхає потік, поки шлях S→T має відʼємну вартість. */
+  /** Штовхає потік, поки шлях S→T має від’ємну вартість. */
   solve(s: number, t: number, maxIter = 4000): void {
     const n = this.adj.length;
     const dist = new Float64Array(n);
@@ -98,7 +98,7 @@ export function importMult(s: GameState): number {
   return m;
 }
 
-/** Доступна генерація обʼєкта зараз, МВт (без урахування мережі). */
+/** Доступна генерація об’єкта зараз, МВт (без урахування мережі). */
 export function availableGen(s: GameState, o: PObj): number {
   const av = objAvail(o) * (o.fireUntil > s.t ? 0.5 : 1);
   switch (o.kind) {

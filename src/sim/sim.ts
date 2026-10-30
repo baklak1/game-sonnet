@@ -96,7 +96,7 @@ function onHour(s: GameState, tHour: number): void {
     const frac = s.demandTotal > 0 ? s.servedTotal / s.demandTotal : 1;
     if (frac < 0.9) {
       s.trust = Math.max(0, s.trust - 8);
-      toast(s, 'Обіцянку світла не виконано. Кияни це запамʼятали: довіра −8', 'bad');
+      toast(s, 'Обіцянку світла не виконано. Кияни це запам’ятали: довіра −8', 'bad');
     }
     s.flags.promiseAt = 0;
   }

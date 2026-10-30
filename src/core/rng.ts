@@ -11,7 +11,7 @@ export function mulberry(seed: number): () => number {
   };
 }
 
-/** Крок генератора, стан якого зберігається в обʼєкті (для серіалізації). */
+/** Крок генератора, стан якого зберігається в об’єкті (для серіалізації). */
 export function rnd(s: { rng: number }): number {
   s.rng = (s.rng + 0x6d2b79f5) >>> 0;
   let t = s.rng;

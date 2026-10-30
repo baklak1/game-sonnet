@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+def ksProps = new Properties()
+def ksFile = rootProject.file('keystore/keystore.properties')
+if (ksFile.exists()) ksFile.withInputStream { ksProps.load(it) }
+
+android {
+    namespace 'com.baklak1.svitloie'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.baklak1.svitloie'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            storeFile rootProject.file('keystore/svitloie.jks')
+            storePassword ksProps['storePassword']
+            keyAlias ksProps['keyAlias']
+            keyPassword ksProps['keyPassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

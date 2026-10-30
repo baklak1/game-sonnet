@@ -1,4 +1,4 @@
-// Безкоштовні обʼєкти від подій (без циклічних імпортів з actions).
+// Безкоштовні об’єкти від подій (без циклічних імпортів з actions).
 import { BUILDS } from '../data/specs';
 import { rnd, rndRange } from '../core/rng';
 import { districtAt, isWater } from './geo';

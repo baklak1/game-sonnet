@@ -46,7 +46,7 @@ export function buildDays(s: GameState, id: string): number {
 export function canPlaceAt(s: GameState, x: number, y: number, minDist = 5): Res {
   if (x < 4 || y < 4 || x > W - 4 || y > H - 4) return fail('За межами карти');
   if (isWater(x, y)) return fail('Не можна будувати на воді');
-  for (const o of s.objs) if (Math.hypot(o.x - x, o.y - y) < minDist) return fail('Занадто близько до іншого обʼєкта');
+  for (const o of s.objs) if (Math.hypot(o.x - x, o.y - y) < minDist) return fail('Занадто близько до іншого об’єкта');
   return OK;
 }
 
@@ -119,10 +119,10 @@ const LINE_ENDS_330 = new Set(['sub330', 'sub750', 'tpp', 'tes', 'hpp', 'pspp'])
 export function lineQuote(s: GameState, specId: string, aId: string, bId: string): Res & { cost?: number; days?: number; km?: number; water?: boolean } {
   const spec = LINE_SPECS[specId];
   const a = objById(s, aId), b = objById(s, bId);
-  if (!spec || !a || !b) return fail('Оберіть два обʼєкти');
+  if (!spec || !a || !b) return fail('Оберіть два об’єкти');
   if (aId === bId) return fail('Оберіть інший кінець');
   const ends = spec.kv === 110 ? LINE_ENDS_110 : LINE_ENDS_330;
-  if (!ends.has(a.kind) || !ends.has(b.kind)) return fail(spec.kv === 110 ? 'ЛЕП 110 зʼєднує ПС 110/330 і станції' : 'ЛЕП 330 зʼєднує ПС 330/750 і станції');
+  if (!ends.has(a.kind) || !ends.has(b.kind)) return fail(spec.kv === 110 ? 'ЛЕП 110 з’єднує ПС 110/330 і станції' : 'ЛЕП 330 з’єднує ПС 330/750 і станції');
   if (a.kind === 'sub110' && b.kind === 'sub110' && spec.kv === 330) return fail('Не той клас напруги');
   if (s.lines.some((l) => (l.a === aId && l.b === bId) || (l.a === bId && l.b === aId))) return fail('Така лінія вже є');
   const px = Math.hypot(a.x - b.x, a.y - b.y);
@@ -159,9 +159,9 @@ export function protQuote(s: GameState, o: PObj): { level: number; cost: number 
 
 export function protect(s: GameState, objId: string): Res {
   const o = objById(s, objId);
-  if (!o || !o.built) return fail('Немає обʼєкта');
+  if (!o || !o.built) return fail('Немає об’єкта');
   const q = protQuote(s, o);
-  if (!q || q.cost === null) return fail('Максимальний захист для цього обʼєкта');
+  if (!q || q.cost === null) return fail('Максимальний захист для цього об’єкта');
   if (q.level > s.unlocked.prot) return fail('Цей рівень захисту ще недоступний');
   if (s.builds.some((b) => b.kind === 'prot' && b.ref === objId)) return fail('Захист уже будується');
   if (s.money < q.cost) return fail('Недостатньо коштів');
@@ -288,7 +288,7 @@ export function sellObject(s: GameState, objId: string): Res {
   const i = s.objs.findIndex((o) => o.id === objId);
   if (i < 0) return fail('Немає');
   const o = s.objs[i];
-  if (o.fixed) return fail('Цей обʼєкт не можна демонтувати');
+  if (o.fixed) return fail('Цей об’єкт не можна демонтувати');
   const spec = Object.values(BUILDS).find((b) => b.kind === o.kind);
   s.money += (spec?.cost ?? 0) * 0.3;
   s.objs.splice(i, 1);

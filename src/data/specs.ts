@@ -55,7 +55,7 @@ export const DEFS: Record<DefType, DefSpec> = {
   mfg: {
     name: 'Мобільна вогнева група', short: 'МВГ', kind: 'gun', cost: 6, upkeep: 0.2, range: 22, rate: 1.25, mag: 9999,
     ammoCost: 0, projSpeed: 0, pk: P(0.3, 0.1, 0.02), deployH: 1, hp: 30, moveSpeed: 6,
-    desc: 'Пікап з великокаліберним кулеметом і прожектором. Дешево, але бʼє лише зблизька.',
+    desc: 'Пікап з великокаліберним кулеметом і прожектором. Дешево, але б’є лише зблизька.',
   },
   manpads: {
     name: 'Група ПЗРК', short: 'ПЗРК', kind: 'missile', cost: 12, upkeep: 0.3, range: 36, rate: 1 / 3, mag: 4,
@@ -85,7 +85,7 @@ export const DEFS: Record<DefType, DefSpec> = {
   nasams: {
     name: 'ЗРК NASAMS', short: 'NASAMS', kind: 'missile', cost: 220, upkeep: 2, range: 72, rate: 0.5, mag: 12,
     ammo: 'nasams', ammoCost: 2.5, projSpeed: 80, pk: P(0.85, 0.85, 0.8), deployH: 8, hp: 60, moveSpeed: 3,
-    desc: 'Зенітний ракетний комплекс середньої дальності. Надійно бʼє крилаті ракети.',
+    desc: 'Зенітний ракетний комплекс середньої дальності. Надійно б’є крилаті ракети.',
   },
   irist: {
     name: 'ЗРК IRIS-T SLM', short: 'IRIS-T', kind: 'missile', cost: 260, upkeep: 2, range: 80, rate: 0.5, mag: 8,
@@ -123,7 +123,7 @@ export const BUILDS: Record<string, BuildSpec> = {
   ses: { id: 'ses', kind: 'ses', name: 'Сонячна станція', cost: 35, days: 2, cap: 10, hp: 50, inCity: true, desc: 'До 10 МВт удень. Влітку — багато, взимку — мало. Паливо безкоштовне.' },
   bess: { id: 'bess', kind: 'bess', name: 'Батарея ДТЕК (BESS)', cost: 140, days: 4, cap: 50, hp: 60, inCity: true, socMax: 100, desc: '50 МВт / 100 МВт·год. Заряджається вночі, віддає в пік і миттєво закриває аварійні провали.' },
   boiler: { id: 'boiler', kind: 'boiler', name: 'Модульна котельня', cost: 8, days: 1, cap: 0, hp: 30, inCity: true, desc: 'Тепло для району, якщо ТЕЦ вибито. Лише взимку має сенс.' },
-  pn: { id: 'pn', kind: 'pn', name: 'Пункт незламності', cost: 3, days: 0.5, cap: 0, hp: 20, inCity: true, desc: 'Тепло, звʼязок і зарядка. Кияни менше злі на відключення в районі (до 3 на район).' },
+  pn: { id: 'pn', kind: 'pn', name: 'Пункт незламності', cost: 3, days: 0.5, cap: 0, hp: 20, inCity: true, desc: 'Тепло, зв’язок і зарядка. Кияни менше злі на відключення в районі (до 3 на район).' },
   sub110: { id: 'sub110', kind: 'sub110', name: 'Підстанція 110 кВ', cost: 45, days: 3, cap: 160, hp: 60, inCity: true, desc: 'Ще один ввід живлення в район. Потрібна ЛЕП до кільця чи станції.' },
   sub330: { id: 'sub330', kind: 'sub330', name: 'Підстанція 330 кВ', cost: 300, days: 8, cap: 800, hp: 160, inCity: false, desc: 'Новий вузол кільця. Підключіть ЛЕП 330 кВ.' },
   base: { id: 'base', kind: 'base', name: 'База бригад', cost: 30, days: 2, cap: 0, hp: 60, inCity: false, desc: 'Бригади відпочивають і стартують звідси. Ставте на іншому березі.' },
@@ -141,7 +141,7 @@ export const PX_PER_KM = 8;
 export const MAX_LINE_PX = 140;
 export const WATER_LINE_MULT = 2.5;
 
-/** Клас обʼєкта для захисту та матеріалів. */
+/** Клас об’єкта для захисту та матеріалів. */
 export function protClass(kind: ObjKind): 'plant' | 'sub' | 'sub110' | 'small' | null {
   if (kind === 'tpp' || kind === 'tes' || kind === 'hpp' || kind === 'pspp') return 'plant';
   if (kind === 'sub750' || kind === 'sub330') return 'sub';
