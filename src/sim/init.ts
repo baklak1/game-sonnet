@@ -137,6 +137,8 @@ export function createState(levelId: string, difficulty: Difficulty, seed: numbe
   for (let i = 0; i < nc; i++) s.crews.push(makeCrew(s, 'city'));
   for (let i = 0; i < nh; i++) s.crews.push(makeCrew(s, 'hv'));
   for (let i = 0; i < np; i++) s.crews.push(makeCrew(s, 'plant'));
+  s.staff = crewPeople(s) + 10;
+  if (L.num >= 7) s.flags.f16Unlocked = 1;
   if (s.mode === 'endless') s.waveDays = [1];
 
   dispatch(s);

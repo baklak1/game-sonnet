@@ -163,6 +163,7 @@ export function endlessAfterWave(s: GameState): void {
     if (u.defs) for (const d of u.defs) if (!s.unlocked.defs.includes(d)) s.unlocked.defs.push(d);
     if (u.prot) s.unlocked.prot = Math.max(s.unlocked.prot, u.prot);
     if (u.techs) for (const t of u.techs) if (!s.unlocked.techs.includes(t)) s.unlocked.techs.push(t);
+    if (u.wave === 6) s.flags.f16Unlocked = 1;
     toast(s, u.text, 'warn');
   }
 }

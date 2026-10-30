@@ -302,6 +302,26 @@ export function sellObject(s: GameState, objId: string): Res {
   return OK;
 }
 
+export const F16_COST = 8;
+
+export function f16Available(s: GameState): boolean {
+  return !!s.flags.f16Unlocked && (s.flags.f16Day ?? -1) !== Math.floor((s.t - 6 * 60) / 1440);
+}
+
+/** Патруль F-16: півгодини збиває крилаті ракети над точкою. Раз на ніч. */
+export function callF16(s: GameState, x: number, y: number): Res {
+  if (!s.flags.f16Unlocked) return fail('F-16 ще недоступні');
+  if (!f16Available(s)) return fail('F-16 вже літали цієї ночі');
+  if (s.money < F16_COST) return fail('Недостатньо коштів');
+  s.money -= F16_COST;
+  s.flags.f16Day = Math.floor((s.t - 6 * 60) / 1440);
+  s.flags.f16Until = s.t + 30;
+  s.flags.f16X = x;
+  s.flags.f16Y = y;
+  toast(s, 'F-16 вилетіли на патрулювання', 'good');
+  return OK;
+}
+
 /** Завершення будівництв. */
 export function processBuilds(s: GameState): void {
   const done = s.builds.filter((b) => b.until <= s.t);

@@ -353,6 +353,15 @@ export const SPRITES: Record<string, string[]> = {
     'kwwwwwr',
     '.kkkk..',
   ],
+  f16: [
+    '..k......',
+    '..kk.....',
+    'kkllkkk..',
+    '.llllllwk',
+    'kkllkkk..',
+    '..kk.....',
+    '..k......',
+  ],
   // ---- орієнтири
   motherland: [
     '....l',
@@ -410,7 +419,7 @@ export function makeSprite(rows: string[], pal: Record<string, string> = SPRITE_
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < rows[y].length; x++) {
       const ch = rows[y][x];
@@ -460,7 +469,7 @@ export class SpriteBank {
 
   constructor() {
     for (const name of Object.keys(SPRITES)) this.plain[name] = makeSprite(SPRITES[name]);
-    for (const name of ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'ballistic', 'crew', 'mfg', 'gepard', 'nasams', 'irist', 'patriot']) {
+    for (const name of ['f16', 'shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'ballistic', 'crew', 'mfg', 'gepard', 'nasams', 'irist', 'patriot']) {
       this.rotated[name] = [];
       for (let i = 0; i < ROT_STEPS; i++) this.rotated[name].push(rotateSprite(this.plain[name], (i / ROT_STEPS) * Math.PI * 2));
     }

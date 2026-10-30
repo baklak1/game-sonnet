@@ -301,6 +301,22 @@ export function combatStep(s: GameState, dtCs: number): void {
     if (spec.cls === 'ballistic') th.prog = 1 - Math.hypot(th.tx - th.x, th.ty - th.y) / (th.dist0 || 1);
   }
 
+  // патруль F-16
+  if ((s.flags.f16Until ?? 0) > s.t) {
+    const fx = s.flags.f16X ?? 0, fy = s.flags.f16Y ?? 0;
+    for (let i = s.threats.length - 1; i >= 0; i--) {
+      const th = s.threats[i];
+      const cls = THREATS[th.type].cls;
+      if (cls === 'ballistic' || th.lost > 0) continue;
+      if ((th.x - fx) ** 2 + (th.y - fy) ** 2 > 55 * 55) continue;
+      const chance = (cls === 'cruise' ? 0.35 : 0.08) * dtCs;
+      if (rnd(s) < chance) {
+        s.fx.push({ t: 'tracer', x1: fx + Math.cos(s.t) * 18, y1: fy + Math.sin(s.t) * 18, x2: th.x, y2: th.y, color: 0 });
+        killThreat(s, th, i);
+      }
+    }
+  }
+
   // РЕБ і РЛС
   for (const d of s.defs) {
     if (!d.built || d.hp <= 0 || d.tx !== undefined) continue;

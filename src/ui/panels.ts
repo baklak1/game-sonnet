@@ -5,7 +5,7 @@ import { AMMO_NAMES, AMMO_PACK, BUILDS, CREWS, DEFS, LINE_SPECS, PROT_NAMES, TEC
 import { DIR_NAMES } from '../data/mapData';
 import type { AmmoType, DefType, GameState, PObj, WavePolicy } from '../sim/types';
 import { availableGen, importMult, objAvail } from '../sim/grid';
-import { ammoPackCost, buildCost, buildDays, fmtMoney, maxContractors, projectCost, protQuote, transformerPrice } from '../sim/actions';
+import { ammoPackCost, buildCost, buildDays, F16_COST, f16Available, fmtMoney, maxContractors, projectCost, protQuote, transformerPrice } from '../sim/actions';
 import { needsProject } from '../sim/crews';
 import { crewPeople } from '../sim/init';
 import { avgServed, goalStatus } from '../sim/objectives';
@@ -287,7 +287,8 @@ export function forecastHtml(s: GameState): string {
   const f = s.forecast;
   if (s.phase === 'alert') {
     const left = s.pending.length + s.threats.length;
-    return `<b>ТРИВОГА</b> · у небі: ${s.threats.length} · ще очікується: ${s.pending.length}${left === 0 ? ' · завершується' : ''}`;
+    const f16 = f16Available(s) ? ` <button class="small" data-act="f16Mode">✈ F-16 · ${F16_COST} млн</button>` : (s.flags.f16Until ?? 0) > s.t ? ' · <b>F-16 в повітрі</b>' : '';
+    return `<b>ТРИВОГА</b> · у небі: ${s.threats.length} · ще очікується: ${s.pending.length}${left === 0 ? ' · завершується' : ''}${f16}`;
   }
   if (f && f.day === day && s.pending.length) {
     if (f.drones < 0) return '<b>Сьогодні о 21:00</b> очікується атака. Даних розвідки немає.';

@@ -44,6 +44,11 @@ export class Renderer {
   season: Season | null = null;
   lights = new LightsLayer();
   lightsKey = '';
+  /** Нічна версія мапи (запечена один раз на сезон) і зведений шар вогнів зі світінням. */
+  nightTerrain: HTMLCanvasElement | null = null;
+  lightsFull: HTMLCanvasElement = document.createElement('canvas');
+  glowSprite: HTMLCanvasElement = makeGlow();
+  labelCache = new Map<string, HTMLCanvasElement>();
   parts: Particle[] = [];
   flashes: { x: number; y: number; r: number; life: number; max: number; color: string }[] = [];
   tracers: { x1: number; y1: number; x2: number; y2: number; life: number; color: string }[] = [];
@@ -69,6 +74,17 @@ export class Renderer {
     this.terrain = bakeTerrain(s.season, reserved, this.bank);
     this.season = s.season;
     this.lightsKey = '';
+    const n = document.createElement('canvas');
+    n.width = W;
+    n.height = H;
+    const nc = n.getContext('2d')!;
+    nc.drawImage(this.terrain.canvas, 0, 0);
+    nc.globalCompositeOperation = 'multiply';
+    nc.fillStyle = 'rgb(48,58,104)';
+    nc.fillRect(0, 0, W, H);
+    this.nightTerrain = n;
+    this.lightsFull.width = W;
+    this.lightsFull.height = H;
   }
 
   /** Перетворює події симуляції на частинки та звуки. */
@@ -152,6 +168,16 @@ export class Renderer {
       const k = s.districts[d].queuesOff;
       return ((q - rot + 6) % 6) >= k;
     });
+    const lc = this.lightsFull.getContext('2d')!;
+    lc.clearRect(0, 0, W, H);
+    lc.imageSmoothingEnabled = true;
+    lc.globalAlpha = 0.8;
+    lc.drawImage(this.lights.glow, 0, 0, W, H);
+    lc.globalAlpha = 1;
+    lc.imageSmoothingEnabled = false;
+    lc.globalCompositeOperation = 'lighter';
+    lc.drawImage(this.lights.canvas, 0, 0);
+    lc.globalCompositeOperation = 'source-over';
   }
 
   draw(s: GameState, cam: Camera, dt: number): void {
@@ -180,19 +206,13 @@ export class Renderer {
     this.drawLines(s, false);
     this.drawObjects(s, 1);
 
-    if (dark > 0.01) {
-      ctx.globalCompositeOperation = 'multiply';
-      const k = dark * 0.88;
-      const r = Math.round(255 - (255 - 34) * k), g = Math.round(255 - (255 - 44) * k), b = Math.round(255 - (255 - 92) * k);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(-20, -20, W + 40, H + 40);
+    if (dark > 0.01 && this.nightTerrain) {
+      ctx.globalAlpha = Math.min(1, dark * 0.95);
+      ctx.drawImage(this.nightTerrain, 0, 0);
+      ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = dark * 0.75;
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(this.lights.glow, 0, 0, W, H);
-      ctx.imageSmoothingEnabled = false;
       ctx.globalAlpha = dark;
-      ctx.drawImage(this.lights.canvas, 0, 0);
+      ctx.drawImage(this.lightsFull, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
       // об’єкти трохи підсвічені, щоб не губилися вночі
@@ -206,6 +226,17 @@ export class Renderer {
     this.drawCrews(s);
     this.drawThreats(s, dark);
     this.drawProjs(s);
+    if ((s.flags.f16Until ?? 0) > s.t) {
+      const a = this.time * 1.6;
+      const fx = (s.flags.f16X ?? 0) + Math.cos(a) * 18, fy = (s.flags.f16Y ?? 0) + Math.sin(a) * 18;
+      const spr = this.bank.rot('f16', a + Math.PI / 2);
+      ctx.drawImage(spr, Math.round(fx - spr.width / 2), Math.round(fy - spr.height / 2));
+      ctx.strokeStyle = 'rgba(127,211,255,0.35)';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.arc(s.flags.f16X ?? 0, s.flags.f16Y ?? 0, 55, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     this.drawParticles();
     this.drawOverlays(s, cam);
 
@@ -365,10 +396,7 @@ export class Renderer {
       }
       if (near) ang = Math.atan2(near.y - d.y, near.x - d.x);
       const len = 26, spread = 0.13;
-      const g = ctx.createLinearGradient(d.x, d.y, d.x + Math.cos(ang) * len, d.y + Math.sin(ang) * len);
-      g.addColorStop(0, `rgba(255,250,210,${0.35 * dark})`);
-      g.addColorStop(1, 'rgba(255,250,210,0)');
-      ctx.fillStyle = g;
+      ctx.fillStyle = `rgba(255,250,210,${0.16 * dark})`;
       ctx.beginPath();
       ctx.moveTo(d.x, d.y);
       ctx.lineTo(d.x + Math.cos(ang - spread) * len, d.y + Math.sin(ang - spread) * len);
@@ -517,27 +545,25 @@ export class Renderer {
       ctx.lineTo(t.x2, t.y2);
       ctx.stroke();
     }
-    for (const p of this.parts) {
-      const a = Math.max(0, p.life / p.max);
-      ctx.globalAlpha = p.add ? a : a * 0.7;
-      ctx.globalCompositeOperation = p.add ? 'lighter' : 'source-over';
-      ctx.fillStyle = p.color;
-      const sz = Math.max(1, Math.round(p.size));
-      ctx.fillRect(Math.round(p.x - sz / 2), Math.round(p.y - sz / 2), sz, sz);
+    for (const add of [false, true]) {
+      ctx.globalCompositeOperation = add ? 'lighter' : 'source-over';
+      for (const p of this.parts) {
+        if (p.add !== add) continue;
+        const a = Math.max(0, p.life / p.max);
+        ctx.globalAlpha = add ? a : a * 0.7;
+        ctx.fillStyle = p.color;
+        const sz = Math.max(1, Math.round(p.size));
+        ctx.fillRect(Math.round(p.x - sz / 2), Math.round(p.y - sz / 2), sz, sz);
+      }
     }
     ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
     for (const f of this.flashes) {
       const a = f.life / f.max;
-      const g = this.ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
-      g.addColorStop(0, `rgba(255,230,160,${0.9 * a})`);
-      g.addColorStop(0.4, `rgba(255,140,60,${0.5 * a})`);
-      g.addColorStop(1, 'rgba(255,100,40,0)');
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = a;
+      ctx.drawImage(this.glowSprite, f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
     }
+    ctx.imageSmoothingEnabled = false;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
   }
@@ -639,60 +665,66 @@ export class Renderer {
     }
   }
 
+  private label(text: string, color: string, px: number): HTMLCanvasElement {
+    const key = `${text}|${color}|${px}`;
+    let c = this.labelCache.get(key);
+    if (c) return c;
+    c = document.createElement('canvas');
+    const ctx = c.getContext('2d')!;
+    ctx.font = `${px}px "Pixelify Sans", monospace`;
+    const w = Math.ceil(ctx.measureText(text).width) + 8;
+    c.width = w;
+    c.height = Math.ceil(px * 1.5);
+    const g = c.getContext('2d')!;
+    g.font = `${px}px "Pixelify Sans", monospace`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = Math.max(2, px / 4);
+    g.strokeStyle = 'rgba(8,10,20,0.85)';
+    g.strokeText(text, w / 2, c.height / 2);
+    g.fillStyle = color;
+    g.fillText(text, w / 2, c.height / 2);
+    if (this.labelCache.size > 400) this.labelCache.clear();
+    this.labelCache.set(key, c);
+    return c;
+  }
+
   private drawLabels(s: GameState, cam: Camera, dark: number): void {
     const ctx = this.ctx;
     const dpr = cam.dpr;
     const z = cam.effZoom;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
     const fs = Math.round(11 * dpr);
-    ctx.font = `${fs}px "Pixelify Sans", monospace`;
+    const put = (c: HTMLCanvasElement, x: number, y: number) => ctx.drawImage(c, Math.round(x - c.width / 2), Math.round(y - c.height / 2));
     if (z < 3.2 || this.overlay === 'grid') {
       for (const d of s.districts) {
         const [x, y] = cam.toScreen(d.cx, d.cy);
+        if (x < -80 || y < -40 || x > cam.cssW + 80 || y > cam.cssH + 40) continue;
         const pct = Math.round(d.frac * 100);
-        const text = `${d.name}`;
         const col = pct >= 97 ? '#a7f3c0' : pct >= 70 ? '#ffe08a' : pct >= 35 ? '#ffb070' : '#ff7a85';
-        ctx.lineWidth = 3 * dpr;
-        ctx.strokeStyle = 'rgba(8,10,20,0.85)';
-        ctx.strokeText(text, x * dpr, y * dpr - fs * 0.6);
-        ctx.fillStyle = '#e8ecf4';
-        ctx.fillText(text, x * dpr, y * dpr - fs * 0.6);
+        put(this.label(d.name, '#e8ecf4', fs), x * dpr, y * dpr - fs * 0.6);
         const t2 = `💡${pct}%${d.queuesOff > 0 ? ` · ${d.queuesOff}/6 черг` : ''}${d.noHeat > 0.3 ? ' · ❄' : ''}`;
-        ctx.strokeText(t2, x * dpr, y * dpr + fs * 0.6);
-        ctx.fillStyle = col;
-        ctx.fillText(t2, x * dpr, y * dpr + fs * 0.6);
+        put(this.label(t2, col, fs), x * dpr, y * dpr + fs * 0.6);
       }
     }
     if (z >= 3) {
-      ctx.font = `${Math.round(9 * dpr)}px "Pixelify Sans", monospace`;
+      const fs2 = Math.round(9 * dpr);
       for (const o of s.objs) {
         if (o.kind !== 'tpp' && o.kind !== 'tes' && o.kind !== 'hpp' && o.kind !== 'pspp' && o.kind !== 'sub750' && o.kind !== 'sub330') continue;
         const [x, y] = cam.toScreen(o.x, o.y + 9);
         if (x < -50 || y < -20 || x > cam.cssW + 50 || y > cam.cssH + 20) continue;
-        ctx.lineWidth = 3 * dpr;
-        ctx.strokeStyle = 'rgba(8,10,20,0.85)';
-        ctx.strokeText(o.name, x * dpr, y * dpr);
-        ctx.fillStyle = '#d6dbe6';
-        ctx.fillText(o.name, x * dpr, y * dpr);
+        put(this.label(o.name, '#d6dbe6', fs2), x * dpr, y * dpr);
       }
     }
     void dark;
-    void getGeo;
   }
 
   pickObject(s: GameState, wx: number, wy: number): Selection {
-    // ППО і бригади мають пріоритет, потім об’єкти, потім лінії, потім район
+    // ППО, потім обʼєкти, потім фургони бригад, потім лінії, потім район
     let best: Selection = null;
-    let bd = 7;
+    let bd = 5;
     for (const d of s.defs) {
       const dd = Math.hypot(d.x - wx, d.y - wy);
       if (dd < bd) { bd = dd; best = { kind: 'def', id: d.id }; }
-    }
-    for (const c of s.crews) {
-      if (c.state === 'injured') continue;
-      const dd = Math.hypot(c.x - wx, c.y - wy);
-      if (dd < bd - 1) { bd = dd; best = { kind: 'crew', id: c.id }; }
     }
     if (best) return best;
     bd = 9;
@@ -701,6 +733,13 @@ export class Renderer {
       const r = spr ? Math.max(spr.width, spr.height) / 2 + 2 : 5;
       const dd = Math.hypot(o.x - wx, o.y - wy);
       if (dd < Math.min(r, bd)) { bd = dd; best = { kind: 'obj', id: o.id }; }
+    }
+    if (best) return best;
+    bd = 5;
+    for (const c of s.crews) {
+      if (c.state === 'injured') continue;
+      const dd = Math.hypot(c.x - wx, c.y - wy);
+      if (dd < bd) { bd = dd; best = { kind: 'crew', id: c.id }; }
     }
     if (best) return best;
     let ld = 2.5;
@@ -723,6 +762,20 @@ export class Renderer {
     }
     return null;
   }
+}
+
+function makeGlow(): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,230,160,0.9)');
+  gr.addColorStop(0.4, 'rgba(255,140,60,0.5)');
+  gr.addColorStop(1, 'rgba(255,100,40,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  return c;
 }
 
 export function defSprite(d: Defense): string {

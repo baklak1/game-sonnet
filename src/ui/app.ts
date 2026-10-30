@@ -25,7 +25,8 @@ type Mode =
   | { t: 'build'; id: string; x?: number; y?: number }
   | { t: 'line'; spec: string; a?: string; b?: string }
   | { t: 'move'; defId: number }
-  | { t: 'assign'; crewId: number };
+  | { t: 'assign'; crewId: number }
+  | { t: 'f16' };
 
 type PanelKind = 'build' | 'def' | 'crews' | 'grid' | 'tech' | 'hq' | 'sel' | null;
 
@@ -274,46 +275,64 @@ export class App {
   }
 
   // ---------------- HUD
-  updateHud(force: boolean): void {
+  private hudBuilt = false;
+
+  buildHud(): void {
+    $('topbar').innerHTML = `<div class="stats">
+      <div class="stat">${iconImg('money')}<b id="h_money"></b></div>
+      <div class="stat">${iconImg('bolt')}<b id="h_served"></b><span id="h_dem" class="opt"></span><div class="bar opt"><i id="h_bar"></i></div></div>
+      <div class="stat">${iconImg('bulb')}<b id="h_frac"></b></div>
+      <div class="stat">${iconImg('heart')}<b id="h_trust"></b></div>
+      <div class="stat opt2">${iconImg('thermo')}<b id="h_temp"></b></div>
+      <div class="stat" id="h_time"></div>
+      <div class="phase" id="h_phase"></div></div>
+      <div class="speed">
+        <button id="h_s0" data-act="speed" data-arg="0">II</button>
+        <button id="h_s1" data-act="speed" data-arg="1">×1</button>
+        <button id="h_s2" data-act="speed" data-arg="2">×2</button>
+        <button id="h_s4" data-act="speed" data-arg="4">×4</button>
+        <button id="h_skip" data-act="skip" title="До вечора">⏭</button>
+        <button data-act="pauseMenu">☰</button>
+      </div>`;
+    this.hudBuilt = true;
+  }
+
+  updateHud(_force: boolean): void {
     const s = this.s;
     if (!s) return;
+    if (!this.hudBuilt) this.buildHud();
     const frac = s.demandTotal > 0 ? s.servedTotal / s.demandTotal : 1;
     const col = frac >= 0.97 ? '#4ade80' : frac >= 0.7 ? '#ffd166' : frac >= 0.4 ? '#ff8c42' : '#ff5a68';
     const tcol = s.trust >= 60 ? '#a7f3c0' : s.trust >= 30 ? '#ffe08a' : '#ff8a94';
     const dark = darkness(s) > 0.5;
-    const phase = s.phase === 'alert' || s.threats.length ? ['alert', 'ТРИВОГА'] : dark ? ['night', 'НІЧ'] : ['day', 'ДЕНЬ'];
+    const alert = s.phase === 'alert' || s.threats.length > 0;
+    const phase = alert ? ['alert', 'ТРИВОГА'] : dark ? ['night', 'НІЧ'] : ['day', 'ДЕНЬ'];
     const sp = s.paused ? 0 : s.speed;
-    const html = `
-      <div class="stat">${iconImg('money')}<b>${A.fmtMoney(s.money)}</b></div>
-      <div class="stat">${iconImg('bolt')}<b>${Math.round(s.servedTotal)}</b>/${Math.round(s.demandTotal)} МВт<div class="bar"><i style="width:${Math.round(frac * 100)}%;background:${col}"></i></div></div>
-      <div class="stat">${iconImg('bulb')}<b style="color:${col}">${Math.round(frac * 100)}%</b></div>
-      <div class="stat">${iconImg('heart')}<b style="color:${tcol}">${Math.round(s.trust)}</b></div>
-      <div class="stat">${iconImg('thermo')}<b>${Math.round(temperature(s))}°</b></div>
-      <div class="stat">${P.timeLabel(s)}</div>
-      <div class="phase ${phase[0]}">${phase[1]}</div>
-      <div class="spacer"></div>
-      <div class="speed" style="display:flex;gap:3px">
-        <button class="${sp === 0 ? 'on' : ''}" data-act="speed" data-arg="0">II</button>
-        <button class="${sp === 1 ? 'on' : ''}" data-act="speed" data-arg="1">×1</button>
-        <button class="${sp === 2 ? 'on' : ''}" data-act="speed" data-arg="2">×2</button>
-        <button class="${sp === 4 ? 'on' : ''}" data-act="speed" data-arg="4">×4</button>
-        <button data-act="skip" title="До вечора" ${s.phase === 'alert' || s.threats.length ? 'disabled' : ''}>⏭</button>
-        <button data-act="pauseMenu">☰</button>
-      </div>`;
-    const tb = $('topbar');
-    if (force || tb.dataset.h !== html) {
-      tb.innerHTML = html;
-      tb.dataset.h = html;
-    }
+    const set = (id: string, text: string) => { const e = $(id); if (e.textContent !== text) e.textContent = text; };
+    set('h_money', A.fmtMoney(s.money));
+    set('h_served', String(Math.round(s.servedTotal)));
+    set('h_dem', `/${Math.round(s.demandTotal)} МВт`);
+    const bar = $('h_bar');
+    bar.style.width = `${Math.round(frac * 100)}%`;
+    bar.style.background = col;
+    set('h_frac', `${Math.round(frac * 100)}%`);
+    $('h_frac').style.color = col;
+    set('h_trust', String(Math.round(s.trust)));
+    $('h_trust').style.color = tcol;
+    set('h_temp', `${Math.round(temperature(s))}°`);
+    set('h_time', P.timeLabel(s));
+    const ph = $('h_phase');
+    set('h_phase', phase[1]);
+    if (ph.className !== `phase ${phase[0]}`) ph.className = `phase ${phase[0]}`;
+    for (const v of [0, 1, 2, 4]) $('h_s' + v).classList.toggle('on', sp === v);
+    ($('h_skip') as HTMLButtonElement).disabled = alert;
     const fc = P.forecastHtml(s);
     const fe = $('forecast');
     if (fe.dataset.h !== fc) {
       fe.innerHTML = fc;
       fe.dataset.h = fc;
-      fe.classList.toggle('hidden', !fc || this.panel !== null);
     }
-    if (this.panel !== null) fe.classList.add('hidden');
-    else if (fc) fe.classList.remove('hidden');
+    fe.classList.toggle('hidden', !fc || this.panel !== null);
     for (const k of ['build', 'def', 'crews', 'grid', 'tech', 'hq']) $('tb_' + k).classList.toggle('on', this.panel === k);
   }
 
@@ -435,6 +454,12 @@ export class App {
         if (res.ok) this.cancelMode();
         return;
       }
+      case 'f16': {
+        const res = A.callF16(s, Math.round(wx), Math.round(wy));
+        this.feedback(res);
+        if (res.ok) this.cancelMode();
+        return;
+      }
       case 'assign': {
         const sel = this.r.pickObject(s, wx, wy);
         let job: string | null = null;
@@ -534,6 +559,7 @@ export class App {
       }
       case 'move': msg = 'Торкніться нового місця для комплексу'; break;
       case 'assign': msg = 'Торкніться пошкодженого об’єкта або лінії'; break;
+      case 'f16': msg = 'Торкніться місця патрулювання F-16 (збивають крилаті ракети ~30 хв)'; break;
     }
     $('buildbar').innerHTML = `<span class="msg">${S.esc(msg)}</span>${m.t === 'def' || m.t === 'build' || m.t === 'line' ? `<button class="primary" data-act="confirmMode" ${canOk ? '' : 'disabled'}>✓</button>` : ''}<button data-act="cancelMode">✕</button>`;
   }
@@ -649,6 +675,7 @@ export class App {
       case 'toggleGrid': this.r.overlay = this.r.overlay === 'grid' ? 'none' : 'grid'; this.renderPanel(); break;
       case 'buyAmmo': if (s) this.feedback(A.buyAmmo(s, arg as AmmoType), 'Боєприпаси закуплено'); break;
       case 'moveDef': this.enterMode({ t: 'move', defId: Number(arg) }); break;
+      case 'f16Mode': this.enterMode({ t: 'f16' }); break;
       case 'sellDef': if (s) { this.feedback(A.sellDefense(s, Number(arg)), 'Комплекс розформовано'); this.closePanel(); } break;
       case 'policy': if (s) { const [id, p] = arg.split(':'); this.feedback(A.setPolicy(s, Number(id), p as FirePolicy)); } break;
       // об’єкти
