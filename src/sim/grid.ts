@@ -312,10 +312,11 @@ export function updateHeat(s: GameState): void {
       continue;
     }
     const src = s.objs.find((o) => o.id === d.heatSrc);
-    let cov = src ? objAvail(src) * (src.fireUntil > s.t ? 0.5 : 1) : 0;
+    const av = src ? objAvail(src) : 0;
+    let cov = av > 0 ? Math.min(1, av + 0.3) * (src && src.fireUntil > s.t ? 0.6 : 1) : 0;
     for (const o of s.objs) {
       if (o.district !== d.id || !o.built || objAvail(o) === 0) continue;
-      if (o.kind === 'boiler') cov += 0.35;
+      if (o.kind === 'boiler') cov += 0.5;
       else if (o.kind === 'kgu') cov += 0.2;
       else if (o.kind === 'gtu') cov += 0.3;
     }

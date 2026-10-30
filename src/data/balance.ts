@@ -33,30 +33,30 @@ export const B = {
   hppDailyHours: 5,
 
   // ---- економіка
-  tariff: 0.002,         // млн ₴ за МВт·год (маржа)
+  tariff: 0.0025,         // млн ₴ за МВт·год (маржа)
   fuelK: 0.001,          // млн ₴ за МВт·год на одиницю genCost
   collectBase: 0.75,
   grantBase: 4,
   salary: 0.06,          // млн ₴/людина/добу
   vehicleUpkeep: 0.05,
-  compensationShare: 0.3,
+  compensationShare: 0.4,
   compensationDelayMin: 2 * 1440,
   hireCost: 3,
   hireN: 5,
   hireDelayMin: 1440,
   transformerCost: 35,
   transformerDelayMin: 3 * 1440,
-  matCost: { tpp: 0.6, tes: 0.6, hpp: 0.6, pspp: 0.5, sub750: 0.4, sub330: 0.4, sub110: 0.15, line: 0.08, small: 0.2 } as Record<string, number>,
+  matCost: { tpp: 0.25, tes: 0.25, hpp: 0.25, pspp: 0.2, sub750: 0.2, sub330: 0.2, sub110: 0.1, line: 0.05, small: 0.1 } as Record<string, number>,
   projectCostPerHp: 0.35,
-  projectDays: 2,
+  projectDays: 1.5,
 
   // ---- довіра
   trustStart: 70,
-  trustGood: 0.2,
-  trustPlanned: 1.2,
-  trustEmerg: 3.0,
+  trustGood: 0.25,
+  trustPlanned: 0.75,
+  trustEmerg: 2.4,
   trustCrit: 1.5,
-  trustHeat: 1.5,
+  trustHeat: 0.45,
   trustQuick: 3,
   pnMitigation: 0.4 / 3,  // за кожен пункт (до 3)
   blackoutFrac: 0.1,
@@ -85,6 +85,7 @@ export const B = {
   ewCruiseAccPenalty: 0.3,
   radarPkBonus: 0.1,
   reloadIdleCs: 20,
+  waveBudgetK: 1.4,
 };
 
 export interface DiffSpec {
@@ -100,10 +101,10 @@ export interface DiffSpec {
 }
 
 export const DIFF: Record<Difficulty, DiffSpec> = {
-  easy: { name: 'Легко', budget: 0.65, acc: -0.15, money: 1.5, income: 1.25, repair: 1.3, trustLoss: 0.7, intelErr: 0, doubleTap: 0 },
+  easy: { name: 'Легко', budget: 0.7, acc: -0.15, money: 1.5, income: 1.25, repair: 1.3, trustLoss: 0.7, intelErr: 0, doubleTap: 0 },
   normal: { name: 'Нормально', budget: 1, acc: 0, money: 1, income: 1, repair: 1, trustLoss: 1, intelErr: 0.25, doubleTap: 0.1 },
-  hard: { name: 'Складно', budget: 1.35, acc: 0.05, money: 0.8, income: 0.9, repair: 0.9, trustLoss: 1.2, intelErr: 0.5, doubleTap: 0.25 },
-  hell: { name: 'Пекло', budget: 1.8, acc: 0.1, money: 0.6, income: 0.75, repair: 0.8, trustLoss: 1.5, intelErr: -1, doubleTap: 0.4 },
+  hard: { name: 'Складно', budget: 1.5, acc: 0.05, money: 0.8, income: 0.9, repair: 0.9, trustLoss: 1.2, intelErr: 0.5, doubleTap: 0.25 },
+  hell: { name: 'Пекло', budget: 2.0, acc: 0.1, money: 0.6, income: 0.75, repair: 0.8, trustLoss: 1.5, intelErr: -1, doubleTap: 0.4 },
 };
 
 export function hpAvail(hp: number, maxHp: number): number {

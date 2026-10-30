@@ -106,9 +106,9 @@ export function prepareDay(s: GameState): void {
   s.alertStart = start;
   let groups: WaveGroupDef[];
   if (w.groups) {
-    groups = w.groups.map((g) => ({ ...g, n: Math.max(1, Math.round(g.n * (g.target ? Math.min(1, D.budget + 0.2) : D.budget))) }));
+    groups = w.groups.map((g) => ({ ...g, n: Math.max(1, Math.round(g.n * (g.target ? Math.min(1.2, D.budget + 0.2) : D.budget * B.waveBudgetK))) }));
   } else {
-    groups = composeBudget(s, (w.budget ?? 30) * D.budget);
+    groups = composeBudget(s, (w.budget ?? 30) * D.budget * (s.mode === 'endless' ? 1 : B.waveBudgetK));
   }
   let gid = (s.flags.groupSeq ?? 0) + 1;
   const pend: PendingSpawn[] = [];

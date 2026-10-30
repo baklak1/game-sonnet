@@ -65,7 +65,8 @@ export function hourly(s: GameState): void {
   }
   const S = servedW / popAll;
   bad /= popAll;
-  if (S >= 0.97) good += B.trustGood;
+  if (S >= 0.95) good += B.trustGood;
+  if (s.trust < 45 && S >= 0.8) good += 0.08;
   const heating = isHeatingSeason(s);
   if (heating) {
     bad += B.trustHeat * (heatW / popAll);

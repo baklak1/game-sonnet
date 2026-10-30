@@ -14,15 +14,15 @@ export interface ThreatSpec {
 }
 
 export const THREATS: Record<ThreatType, ThreatSpec> = {
-  shahed: { name: 'Шахед', short: 'Шахед', cls: 'drone', speed: 7, dmg: 22, acc: 0.85, cost: 1 },
+  shahed: { name: 'Шахед', short: 'Шахед', cls: 'drone', speed: 7, dmg: 28, acc: 0.85, cost: 1 },
   gerbera: { name: 'Гербера (дрон-імітатор)', short: 'Гербера', cls: 'drone', speed: 7, dmg: 0, acc: 0, cost: 0.4, decoy: true },
-  jet: { name: 'Реактивний шахед', short: 'Реакт. шахед', cls: 'drone', speed: 20, dmg: 24, acc: 0.85, cost: 3 },
+  jet: { name: 'Реактивний шахед', short: 'Реакт. шахед', cls: 'drone', speed: 20, dmg: 30, acc: 0.85, cost: 3 },
   recon: { name: 'Розвідувальний БпЛА', short: 'Розвідник', cls: 'drone', speed: 6, dmg: 0, acc: 0, cost: 2, recon: true },
-  kh101: { name: 'Крилата ракета Х-101', short: 'Х-101', cls: 'cruise', speed: 26, dmg: 60, acc: 0.9, cost: 7 },
-  kalibr: { name: 'Крилата ракета «Калібр»', short: 'Калібр', cls: 'cruise', speed: 24, dmg: 50, acc: 0.88, cost: 6 },
-  iskander: { name: 'Балістична ракета «Іскандер-М»', short: 'Іскандер', cls: 'ballistic', speed: 80, dmg: 65, acc: 0.92, cost: 9 },
-  kinzhal: { name: 'Аеробалістична ракета «Кинджал»', short: 'Кинджал', cls: 'ballistic', speed: 120, dmg: 75, acc: 0.92, cost: 12 },
-  zircon: { name: 'Ракета «Циркон»', short: 'Циркон', cls: 'ballistic', speed: 140, dmg: 70, acc: 0.9, cost: 14 },
+  kh101: { name: 'Крилата ракета Х-101', short: 'Х-101', cls: 'cruise', speed: 26, dmg: 75, acc: 0.9, cost: 7 },
+  kalibr: { name: 'Крилата ракета «Калібр»', short: 'Калібр', cls: 'cruise', speed: 24, dmg: 65, acc: 0.88, cost: 6 },
+  iskander: { name: 'Балістична ракета «Іскандер-М»', short: 'Іскандер', cls: 'ballistic', speed: 80, dmg: 80, acc: 0.92, cost: 9 },
+  kinzhal: { name: 'Аеробалістична ракета «Кинджал»', short: 'Кинджал', cls: 'ballistic', speed: 120, dmg: 90, acc: 0.92, cost: 12 },
+  zircon: { name: 'Ракета «Циркон»', short: 'Циркон', cls: 'ballistic', speed: 140, dmg: 85, acc: 0.9, cost: 14 },
 };
 
 export type DefKind = 'gun' | 'missile' | 'aura' | 'sensor';
@@ -83,17 +83,17 @@ export const DEFS: Record<DefType, DefSpec> = {
     desc: 'Розпізнає Гербери-імітатори та дає +10% влучності ППО в зоні огляду.',
   },
   nasams: {
-    name: 'ЗРК NASAMS', short: 'NASAMS', kind: 'missile', cost: 220, upkeep: 2, range: 72, rate: 0.5, mag: 12,
+    name: 'ЗРК NASAMS', short: 'NASAMS', kind: 'missile', cost: 220, upkeep: 1, range: 72, rate: 0.5, mag: 12,
     ammo: 'nasams', ammoCost: 2.5, projSpeed: 80, pk: P(0.85, 0.85, 0.8), deployH: 8, hp: 60, moveSpeed: 3,
     desc: 'Зенітний ракетний комплекс середньої дальності. Надійно б’є крилаті ракети.',
   },
   irist: {
-    name: 'ЗРК IRIS-T SLM', short: 'IRIS-T', kind: 'missile', cost: 260, upkeep: 2, range: 80, rate: 0.5, mag: 8,
+    name: 'ЗРК IRIS-T SLM', short: 'IRIS-T', kind: 'missile', cost: 260, upkeep: 1, range: 80, rate: 0.5, mag: 8,
     ammo: 'irist', ammoCost: 3.5, projSpeed: 90, pk: P(0.9, 0.9, 0.9), deployH: 8, hp: 60, moveSpeed: 3,
     desc: 'Сучасний ЗРК середньої дальності. Дорогі ракети — не витрачайте їх на шахеди.',
   },
   patriot: {
-    name: 'ЗРК Patriot', short: 'Patriot', kind: 'missile', cost: 650, upkeep: 4, range: 100, rate: 1 / 1.5, mag: 8,
+    name: 'ЗРК Patriot', short: 'Patriot', kind: 'missile', cost: 650, upkeep: 2, range: 100, rate: 1 / 1.5, mag: 8,
     ammo: 'patriot', ammoCost: 12, projSpeed: 160, pk: P(0.95, 0.95, 0.95, 0.75, 0.55, 0.35), deployH: 12, hp: 80, moveSpeed: 2,
     desc: 'Єдиний засіб проти балістики. Кожна ракета PAC-3 коштує як підстанція.',
   },

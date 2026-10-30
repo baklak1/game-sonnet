@@ -81,7 +81,7 @@ function endAlert(s: GameState): void {
   reloadAll(s);
   const w = s.mode === 'campaign' ? levelById(s.levelId).waves.find((ww) => ww.day === day) : null;
   if (w?.after) SCRIPTED[w.after]?.(s);
-  else if (rnd(s) < 0.45) ukrLimit(s, 0.72 + rnd(s) * 0.18, 12 + Math.floor(rnd(s) * 18));
+  else if (rnd(s) < 0.55) ukrLimit(s, 0.68 + rnd(s) * 0.2, 12 + Math.floor(rnd(s) * 18));
   if (s.mode === 'endless') endlessAfterWave(s);
   s.waveStats = null;
 }
