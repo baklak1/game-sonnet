@@ -1,0 +1,10 @@
+node_modules/
+dist/
+tools/out/
+tools/geo-cache/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/app/src/main/assets/www/
+*.log

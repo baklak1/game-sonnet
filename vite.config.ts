@@ -1,0 +1,17 @@
+import { defineConfig } from 'vite';
+import { viteSingleFile } from 'vite-plugin-singlefile';
+
+export default defineConfig({
+  base: './',
+  plugins: [viteSingleFile()],
+  build: {
+    target: 'es2019',
+    assetsInlineLimit: 100000000,
+    cssCodeSplit: false,
+    modulePreload: false,
+    reportCompressedSize: false,
+  },
+  test: {
+    include: ['tests/**/*.test.ts'],
+  },
+});
