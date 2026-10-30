@@ -1,14 +1,66 @@
-// Процедурний звук на WebAudio: сирена, «мопед» шахедів, кулемети, пуски, вибухи, гул генераторів.
+// Звук: записані CC0-семпли (src/assets/sfx, див. CREDITS.md) через WebAudio.
+// Якщо семпл не декодувався — процедурний запасний варіант.
+import sirenUrl from '../assets/sfx/siren.ogg';
+import allclearUrl from '../assets/sfx/allclear.ogg';
+import boomUrl from '../assets/sfx/boom.ogg';
+import bigboomUrl from '../assets/sfx/bigboom.ogg';
+import killUrl from '../assets/sfx/kill.ogg';
+import popUrl from '../assets/sfx/pop.ogg';
+import mgUrl from '../assets/sfx/mg.ogg';
+import gepardUrl from '../assets/sfx/gepard.ogg';
+import launchUrl from '../assets/sfx/launch.ogg';
+import interceptorUrl from '../assets/sfx/interceptor.ogg';
+import droneUrl from '../assets/sfx/drone_loop.ogg';
+import generatorUrl from '../assets/sfx/generator_loop.ogg';
+import clickUrl from '../assets/sfx/click.ogg';
+import okUrl from '../assets/sfx/ok.ogg';
+import errorUrl from '../assets/sfx/error.ogg';
+import buildUrl from '../assets/sfx/build.ogg';
+import alarmUrl from '../assets/sfx/alarm.ogg';
+import boom2Url from '../assets/sfx/boom2.ogg';
+import boomFarUrl from '../assets/sfx/boom_far.ogg';
+import kill2Url from '../assets/sfx/kill2.ogg';
+import repairUrl from '../assets/sfx/repair.ogg';
+
+const URLS: Record<string, string> = {
+  siren: sirenUrl, allclear: allclearUrl, boom: boomUrl, bigboom: bigboomUrl, kill: killUrl, pop: popUrl,
+  mg: mgUrl, gepard: gepardUrl, launch: launchUrl, interceptor: interceptorUrl, drone_loop: droneUrl,
+  generator_loop: generatorUrl, click: clickUrl, ok: okUrl, error: errorUrl, build: buildUrl, alarm: alarmUrl,
+  boom2: boom2Url, boom_far: boomFarUrl, kill2: kill2Url, repair: repairUrl,
+};
+
+/** Варіанти: випадковий вибір, щоб звук не повторювався. */
+const VARIANTS: Record<string, string[]> = { boom: ['boom', 'boom2'], kill: ['kill', 'kill2'] };
+
+/** Відносна гучність семплів. */
+const GAIN: Record<string, number> = {
+  siren: 0.7, allclear: 0.6, boom: 0.8, bigboom: 1, kill: 0.5, pop: 0.35, mg: 0.45, gepard: 0.55, launch: 0.55,
+  interceptor: 0.35, click: 0.35, ok: 0.4, error: 0.4, build: 0.5, alarm: 0.5, boom2: 0.8, boom_far: 0.6, kill2: 0.5, repair: 0.35,
+};
+
+async function toArrayBuffer(url: string): Promise<ArrayBuffer> {
+  if (url.startsWith('data:')) {
+    const b64 = url.slice(url.indexOf(',') + 1);
+    const bin = atob(b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf.buffer;
+  }
+  const r = await fetch(url);
+  return r.arrayBuffer();
+}
 
 export class Sfx {
   ctx: AudioContext | null = null;
   master: GainNode | null = null;
   enabled = true;
-  ambient = true;
+  ambient = false;
+  private buffers: Record<string, AudioBuffer> = {};
   private noise: AudioBuffer | null = null;
   private last: Record<string, number> = {};
   private droneGain: GainNode | null = null;
   private genGain: GainNode | null = null;
+  private loopsStarted = false;
   private sirenUntil = 0;
 
   unlock(): void {
@@ -17,22 +69,59 @@ export class Sfx {
       if (!AC) return;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.55;
+      this.master.gain.value = 0.6;
       this.master.connect(this.ctx.destination);
       const len = this.ctx.sampleRate * 1.5;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      this.startLoops();
+      void this.loadAll();
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
 
-  private startLoops(): void {
+  private async loadAll(): Promise<void> {
     const ctx = this.ctx!;
-    // гул шахедів: два розстроєні пилкоподібні + фільтр
+    await Promise.all(Object.entries(URLS).map(async ([name, url]) => {
+      try {
+        const data = await toArrayBuffer(url);
+        this.buffers[name] = await new Promise<AudioBuffer>((res, rej) => ctx.decodeAudioData(data, res, rej));
+      } catch {
+        /* лишаємо процедурний запасний варіант */
+      }
+    }));
+    this.startLoops();
+  }
+
+  private startLoops(): void {
+    if (this.loopsStarted || !this.ctx) return;
+    this.loopsStarted = true;
+    const ctx = this.ctx;
     this.droneGain = ctx.createGain();
     this.droneGain.gain.value = 0;
+    this.droneGain.connect(this.master!);
+    this.genGain = ctx.createGain();
+    this.genGain.gain.value = 0;
+    this.genGain.connect(this.master!);
+    const loop = (name: string, out: GainNode, rate: number) => {
+      const b = this.buffers[name];
+      if (!b) return false;
+      const src = ctx.createBufferSource();
+      src.buffer = b;
+      src.loop = true;
+      src.playbackRate.value = rate;
+      src.connect(out);
+      src.start();
+      return true;
+    };
+    // «мопед» шахедів: два шари з різною висотою — рій звучить густіше
+    if (!loop('drone_loop', this.droneGain, 1)) this.procDrone();
+    else loop('drone_loop', this.droneGain, 1.13);
+    if (!loop('generator_loop', this.genGain, 0.8)) this.procGenerator();
+  }
+
+  private procDrone(): void {
+    const ctx = this.ctx!;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 520;
@@ -43,38 +132,67 @@ export class Sfx {
       o.connect(lp);
       o.start();
     }
-    const trem = ctx.createOscillator();
-    const tg = ctx.createGain();
-    trem.frequency.value = 11;
-    tg.gain.value = 0.3;
-    trem.connect(tg);
-    tg.connect(this.droneGain.gain);
-    trem.start();
-    lp.connect(this.droneGain);
-    this.droneGain.connect(this.master!);
-    // гул генераторів у темних районах
-    this.genGain = ctx.createGain();
-    this.genGain.gain.value = 0;
-    const lp2 = ctx.createBiquadFilter();
-    lp2.type = 'lowpass';
-    lp2.frequency.value = 180;
-    const g1 = ctx.createOscillator();
-    g1.type = 'sawtooth';
-    g1.frequency.value = 50;
-    g1.connect(lp2);
-    g1.start();
-    lp2.connect(this.genGain);
-    this.genGain.connect(this.master!);
+    lp.connect(this.droneGain!);
+  }
+
+  private procGenerator(): void {
+    const ctx = this.ctx!;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 180;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = 50;
+    o.connect(lp);
+    o.start();
+    lp.connect(this.genGain!);
   }
 
   setLevels(drones: number, darkFrac: number): void {
     if (!this.ctx || !this.droneGain || !this.genGain) return;
     const t = this.ctx.currentTime;
     const on = this.enabled ? 1 : 0;
-    this.droneGain.gain.setTargetAtTime(on * Math.min(0.09, drones * 0.012), t, 0.3);
-    this.genGain.gain.setTargetAtTime(on * (this.ambient ? Math.min(0.05, darkFrac * 0.07) : 0), t, 0.8);
+    this.droneGain.gain.setTargetAtTime(on * Math.min(0.45, drones * 0.06), t, 0.3);
+    this.genGain.gain.setTargetAtTime(on * (this.ambient ? Math.min(0.25, darkFrac * 0.35) : 0), t, 0.8);
   }
 
+  private sample(name: string, vol: number, rateJitter = 0.08): boolean {
+    const b = this.buffers[name];
+    if (!b || !this.ctx) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = b;
+    src.playbackRate.value = 1 + (Math.random() * 2 - 1) * rateJitter;
+    const g = this.ctx.createGain();
+    g.gain.value = vol * (GAIN[name] ?? 0.5);
+    src.connect(g);
+    g.connect(this.master!);
+    src.start();
+    return true;
+  }
+
+  play(name: string, vol = 1): void {
+    if (!this.enabled || !this.ctx || vol < 0.03) return;
+    const now = performance.now();
+    const minGap: Record<string, number> = { mg: 90, gepard: 80, boom: 70, kill: 60, pop: 50, launch: 120, interceptor: 120, click: 30, bigboom: 120 };
+    if (now - (this.last[name] ?? 0) < (minGap[name] ?? 0)) return;
+    this.last[name] = now;
+    const v = Math.min(1, vol);
+    if (name === 'siren') {
+      if (this.ctx.currentTime < this.sirenUntil) return;
+      this.sirenUntil = this.ctx.currentTime + 10;
+      if (this.sample('siren', v, 0)) return;
+      this.procSiren();
+      return;
+    }
+    const vars = VARIANTS[name];
+    const pickName = vars ? vars[Math.floor(Math.random() * vars.length)] : name;
+    // далекий вибух — глухіший звук
+    if ((name === 'boom' || name === 'bigboom') && v < 0.35 && this.sample('boom_far', Math.min(1, v * 2.2))) return;
+    if (this.sample(pickName, v) || this.sample(name, v)) return;
+    this.procedural(name, v);
+  }
+
+  // ---------- процедурний запасний варіант
   private env(g: GainNode, a: number, peak: number, d: number): void {
     const t = this.ctx!.currentTime;
     g.gain.setValueAtTime(0.0001, t);
@@ -116,13 +234,7 @@ export class Sfx {
     o.stop(t + dur + 0.05);
   }
 
-  play(name: string, vol = 1): void {
-    if (!this.enabled || !this.ctx || vol < 0.03) return;
-    const now = performance.now();
-    const minGap: Record<string, number> = { mg: 70, gepard: 60, boom: 60, kill: 50, pop: 40, launch: 90, interceptor: 90, click: 30 };
-    if (now - (this.last[name] ?? 0) < (minGap[name] ?? 0)) return;
-    this.last[name] = now;
-    const v = Math.min(1, vol);
+  private procedural(name: string, v: number): void {
     switch (name) {
       case 'click': this.tone(900, 0.05, 'square', 0.05 * v); break;
       case 'ok': this.tone(660, 0.08, 'square', 0.05 * v); this.tone(990, 0.12, 'square', 0.05 * v, undefined, 0.08); break;
@@ -137,16 +249,13 @@ export class Sfx {
       case 'bigboom': this.noiseBurst(1.4, 400, 0.5, 0.5 * v, 'lowpass', 80); this.tone(55, 1.0, 'sine', 0.45 * v, 28); break;
       case 'alarm': for (let i = 0; i < 3; i++) this.tone(880, 0.12, 'square', 0.05 * v, undefined, i * 0.2); break;
       case 'build': this.tone(523, 0.1, 'triangle', 0.08 * v); this.tone(784, 0.18, 'triangle', 0.08 * v, undefined, 0.1); break;
-      case 'siren': this.siren(); break;
       case 'allclear': [523, 659, 784].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.07 * v, undefined, i * 0.25)); break;
     }
   }
 
-  private siren(): void {
+  private procSiren(): void {
     const ctx = this.ctx!;
-    if (ctx.currentTime < this.sirenUntil) return;
     const dur = 7;
-    this.sirenUntil = ctx.currentTime + dur;
     const g = ctx.createGain();
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';

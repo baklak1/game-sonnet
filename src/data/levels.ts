@@ -232,7 +232,7 @@ export const LEVELS: LevelDef[] = [
     defs: [['mfg', 326, 140], ['mfg', 372, 256], ['mfg', 420, 150], ['mfg', 250, 200], ['gepard', 410, 225], ['gepard', 340, 110], ['nasams', 300, 200], ['patriot', 330, 230], ['irist', 380, 280], ['interceptor', 360, 170]],
     objHp: { tryp: 0.05, tec5: 0.85, tec6: 0.8 },
     extraObjs: [{ build: 'bess', x: 400, y: 228 }],
-    unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'patriot', 'irist', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'sub330', 'line330'], prot: 2, techs: ALL_TECH, threats: ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'iskander', 'kinzhal'] },
+    unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'patriot', 'irist', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'wes', 'sub330', 'line330'], prot: 2, techs: ALL_TECH, threats: ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'iskander', 'kinzhal'] },
     waves: [
       { day: 1, budget: 50, policy: 'mixed' },
       { day: 3, budget: 55, policy: 'distribution' },
@@ -254,7 +254,7 @@ export const LEVELS: LevelDef[] = [
     defs: [['mfg', 326, 140], ['mfg', 372, 256], ['mfg', 420, 150], ['mfg', 250, 200], ['mfg', 440, 230], ['mfg', 345, 100], ['gepard', 410, 225], ['gepard', 340, 110], ['gepard', 385, 250], ['interceptor', 360, 170], ['interceptor', 430, 160], ['nasams', 300, 200], ['irist', 380, 280], ['patriot', 330, 230], ['radar', 350, 180], ['ew', 400, 210]],
     objHp: { tryp: 0.05, tec5: 0.7, tec6: 0.6, darn: 0.8 },
     extraObjs: [{ build: 'bess', x: 400, y: 228 }, { build: 'bess', x: 300, y: 225 }],
-    unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'patriot', 'irist', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'sub330', 'line330'], prot: 3, techs: ALL_TECH, threats: ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'iskander', 'kinzhal', 'zircon'] },
+    unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'patriot', 'irist', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'wes', 'sub330', 'line330'], prot: 3, techs: ALL_TECH, threats: ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'iskander', 'kinzhal', 'zircon'] },
     waves: [
       { day: 1, budget: 60, policy: 'mixed' },
       {
@@ -301,7 +301,7 @@ export const LEVELS: LevelDef[] = [
     stock: { manpads: 16, gepard: 200, nasams: 16, patriot: 12, irist: 16, interceptor: 60 },
     defs: [['mfg', 326, 140], ['mfg', 372, 256], ['mfg', 420, 150], ['mfg', 250, 200], ['gepard', 410, 225], ['gepard', 340, 110], ['interceptor', 360, 170], ['nasams', 300, 200], ['irist', 380, 280], ['patriot', 330, 230], ['radar', 350, 180]],
     objHp: { tryp: 0.05, tec5: 0.75, tec6: 0.7, darn: 0.7 },
-    unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'patriot', 'irist', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'sub330', 'line330'], prot: 3, techs: ALL_TECH, threats: ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'iskander', 'kinzhal', 'zircon'] },
+    unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'patriot', 'irist', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'wes', 'sub330', 'line330'], prot: 3, techs: ALL_TECH, threats: ['shahed', 'gerbera', 'jet', 'recon', 'kh101', 'kalibr', 'iskander', 'kinzhal', 'zircon'] },
     waves: [
       { day: 1, budget: 50, policy: 'distribution' },
       { day: 3, budget: 60, policy: 'mixed' },
@@ -325,7 +325,7 @@ export const ENDLESS: LevelDef = {
   stock: { manpads: 12, gepard: 120, nasams: 12, irist: 8, patriot: 8, interceptor: 30 },
   defs: [['mfg', 326, 140], ['mfg', 372, 256], ['mfg', 420, 150], ['mfg', 250, 200], ['gepard', 410, 225], ['nasams', 300, 200]],
   objHp: { tryp: 0.05, tec5: 0.7, tec6: 0.5, darn: 0.6 },
-  unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'sub330', 'line330'], prot: 2, techs: MID_TECH, threats: ['shahed', 'gerbera'] },
+  unlock: { defs: ['mfg', 'manpads', 'gepard', 'nasams', 'radar', 'ew', 'interceptor'], builds: [...GRID_BUILDS, 'kgu', 'boiler', 'gtu', 'ses', 'bess', 'wes', 'sub330', 'line330'], prot: 2, techs: MID_TECH, threats: ['shahed', 'gerbera'] },
   waves: [],
   randomEvents: true,
   goal: { type: 'endless' },

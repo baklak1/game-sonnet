@@ -2,6 +2,7 @@
 import { B, DIFF } from '../data/balance';
 import { CREWS, DEFS } from '../data/specs';
 import { isHeatingSeason } from './demand';
+import { metroFactor as metroFactorNow } from './grid';
 import type { GameState } from './types';
 import { crewPeople } from './init';
 
@@ -24,7 +25,8 @@ export function collection(s: GameState): number {
 export function economyTick(s: GameState, dtMin: number): void {
   const h = dtMin / 60;
   const D = DIFF[s.difficulty];
-  const revenue = s.servedTotal * h * B.tariff * collection(s) * D.income;
+  const homes = Math.max(0, s.servedTotal - s.industryServed);
+  const revenue = (homes * collection(s) + s.industryServed * B.businessTariff) * h * B.tariff * D.income;
   let fuel = 0;
   for (const o of s.objs) {
     if (o.out <= 0) continue;
@@ -87,6 +89,13 @@ export function hourly(s: GameState): void {
     } else critOff++;
   }
   bad += B.trustCrit * critOff;
+  // метро: зупинені лінії злять киян (у години роботи)
+  const mHour = Math.floor((((s.t % 1440) + 1440) % 1440) / 60);
+  if (mHour >= 6) {
+    let need = 0, got = 0;
+    for (const o of s.objs) if (o.kind === 'metro') { need += o.cap; got += Math.min(o.cap, (o.critServed ?? 0) / Math.max(0.2, metroFactorNow(s.t))); }
+    if (need > 0) bad += B.trustMetro * Math.max(0, 1 - got / need);
+  }
   if (critOff > 0) {
     s.stats.critOutage++;
     s.stats.critOutageMax = Math.max(s.stats.critOutageMax, s.stats.critOutage);

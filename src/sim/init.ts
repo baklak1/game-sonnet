@@ -5,11 +5,12 @@ import { BUILDS, CREWS, DEFS } from '../data/specs';
 import { levelById } from '../data/levels';
 import { districtAt } from './geo';
 import { DISTRICTS as DDEF } from '../data/objects';
-import type { AmmoType, Crew, CrewType, Defense, DefType, Difficulty, GameState, PObj } from './types';
+import { METRO_LINES, stationPos } from '../data/metro';
+import type { AmmoType, Crew, CrewType, Defense, DefType, Difficulty, DistrictId, GameState, PObj } from './types';
 import { prepareDay } from './waves';
 import { dispatch, updateHeat } from './grid';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export function objById(s: GameState, id: string): PObj | undefined {
   for (const o of s.objs) if (o.id === id) return o;
@@ -115,7 +116,7 @@ export function createState(levelId: string, difficulty: Difficulty, seed: numbe
     enemyIntel: null,
     waveIndex: 0, waveDays: L.waves.map((w) => w.day), waveStats: null, lastWaveReport: null, forecast: null,
     autoRepair: true, crewRisk: false,
-    gridDirty: true, lastDispatch: -999, genTotal: 0, demandTotal: 0, servedTotal: 0, importUsed: 0,
+    gridDirty: true, lastDispatch: -999, genTotal: 0, demandTotal: 0, servedTotal: 0, importUsed: 0, industryServed: 0,
     fx: [], toasts: [], news: [], choice: null,
     stats: {
       downed: {}, launched: {}, hits: 0, missiles: 0, adCost: 0, servedAcc: 0, hoursAcc: 0, heatAcc: 0, heatHours: 0,
@@ -123,8 +124,33 @@ export function createState(levelId: string, difficulty: Difficulty, seed: numbe
     },
     waveAcc: { t: 0 },
     flags: { hppLeft: 440 * B.hppDailyHours, maxContractors: 2 },
-    over: null, speed: 1, paused: false,
+    over: null, speed: 2, paused: false,
   };
+
+  // метро: тягове живлення кожної лінії розподілене по районах, де її станції
+  for (const line of METRO_LINES) {
+    const groups = new Map<string, [number, number][]>();
+    for (const st of line.stations) {
+      const [x, y] = stationPos(st);
+      let di = districtAt(x, y);
+      if (di < 0) {
+        let bd = 1e9;
+        DDEF.forEach((d, k) => { const dd = (d.lx - x) ** 2 + (d.ly - y) ** 2; if (dd < bd) { bd = dd; di = k; } });
+      }
+      const id = DDEF[di].id;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id)!.push([x, y]);
+    }
+    for (const [did, pts] of groups) {
+      const x = pts.reduce((a, p) => a + p[0], 0) / pts.length, y = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+      s.objs.push({
+        id: `metro_${line.id}_${did}`, kind: 'metro', name: `Метро ${line.id}: ${DDEF.find((d) => d.id === did)!.name}`,
+        x, y, hp: 100, maxHp: 100, prot: 0, cap: (line.mw * pts.length) / line.stations.length, district: did as DistrictId,
+        built: true, fireUntil: 0, out: 0, fixed: true, critServed: 0,
+      });
+    }
+  }
+  s.flags.wind = 0.5;
 
   for (const t of L.techs ?? []) s.tech[t] = true;
   for (const e of L.extraObjs ?? []) {

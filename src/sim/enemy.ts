@@ -10,7 +10,7 @@ import { availableGen, objAvail } from './grid';
 
 const POLICIES: WavePolicy[] = ['mixed', 'generation', 'ring', 'imports', 'distribution', 'finish'];
 
-const TARGETABLE = new Set(['tpp', 'tes', 'hpp', 'pspp', 'sub750', 'sub330', 'sub110', 'kgu', 'gtu', 'bess', 'ses', 'decoy', 'import']);
+const TARGETABLE = new Set(['tpp', 'tes', 'hpp', 'pspp', 'sub750', 'sub330', 'sub110', 'kgu', 'gtu', 'bess', 'ses', 'decoy', 'import', 'wte', 'wes']);
 
 export function spawnPoint(s: GameState, dir: string): [number, number] {
   const seg = SPAWNS[dir] ?? SPAWNS.N;
@@ -31,6 +31,8 @@ function objValue(s: GameState, o: PObj, policy: WavePolicy, cls: string, intelF
     case 'bess': v = 90; break;
     case 'kgu': case 'gtu': v = 25 + o.cap; break;
     case 'ses': v = 12; break;
+    case 'wes': v = 20 + o.out; break;
+    case 'wte': v = 40; break;
     case 'decoy': v = intelFresh ? 0 : 120; break;
   }
   const plant = o.kind === 'tpp' || o.kind === 'tes' || o.kind === 'hpp' || o.kind === 'pspp';

@@ -3,6 +3,7 @@ import type { Difficulty, GameState } from '../sim/types';
 import { SAVE_VERSION } from '../sim/init';
 
 export interface Settings {
+  autopause: boolean;
   sound: boolean;
   ambient: boolean;
   vibro: boolean;
@@ -22,7 +23,7 @@ const KP = 'svitlo:progress:v1';
 const KR = 'svitlo:run:v1';
 
 export function loadProgress(): Progress {
-  const def: Progress = { stars: {}, diffDone: {}, best: {}, bestWaves: {}, tutorialDone: false, settings: { sound: true, ambient: true, vibro: true, lowFx: false } };
+  const def: Progress = { stars: {}, diffDone: {}, best: {}, bestWaves: {}, tutorialDone: false, settings: { autopause: true, sound: true, ambient: false, vibro: true, lowFx: false } };
   try {
     const raw = localStorage.getItem(KP);
     if (!raw) return def;

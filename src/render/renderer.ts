@@ -11,6 +11,30 @@ import { SpriteBank } from './sprites';
 import { bakeTerrain, LightsLayer, type Terrain } from './terrain';
 import { C } from './palette';
 import { hash2 } from '../core/rng';
+import { METRO_LINES, stationPos } from '../data/metro';
+import { districtAt } from '../sim/geo';
+import { DISTRICTS } from '../data/objects';
+
+interface MetroGeom { id: string; color: string; dark: string; pts: [number, number][]; cum: number[]; len: number; objOf: string[]; trains: { d: number; dir: number }[] }
+
+function buildMetroGeom(): MetroGeom[] {
+  return METRO_LINES.map((l) => {
+    const pts = l.stations.map((n) => stationPos(n));
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const objOf = pts.map(([x, y]) => {
+      let di = districtAt(x, y);
+      if (di < 0) {
+        let bd = 1e9;
+        DISTRICTS.forEach((d, k) => { const dd = (d.lx - x) ** 2 + (d.ly - y) ** 2; if (dd < bd) { bd = dd; di = k; } });
+      }
+      return `metro_${l.id}_${DISTRICTS[di].id}`;
+    });
+    const len = cum[cum.length - 1];
+    const trains = Array.from({ length: l.trains }, (_, i) => ({ d: (len * i) / l.trains, dir: i % 2 ? -1 : 1 }));
+    return { id: l.id, color: l.color, dark: l.dark, pts, cum, len, objOf, trains };
+  });
+}
 
 interface Particle {
   x: number; y: number; vx: number; vy: number; life: number; max: number;
@@ -19,6 +43,7 @@ interface Particle {
 
 export type Selection =
   | { kind: 'obj'; id: string }
+  | { kind: 'metro'; id: string }
   | { kind: 'def'; id: number }
   | { kind: 'crew'; id: number }
   | { kind: 'line'; id: string }
@@ -49,6 +74,8 @@ export class Renderer {
   lightsFull: HTMLCanvasElement = document.createElement('canvas');
   glowSprite: HTMLCanvasElement = makeGlow();
   labelCache = new Map<string, HTMLCanvasElement>();
+  metro: MetroGeom[] = buildMetroGeom();
+  private lastT = -1;
   parts: Particle[] = [];
   flashes: { x: number; y: number; r: number; life: number; max: number; color: string }[] = [];
   tracers: { x1: number; y1: number; x2: number; y2: number; life: number; color: string }[] = [];
@@ -159,7 +186,7 @@ export class Renderer {
 
   private refreshLights(s: GameState, dark: number): void {
     const rot = Math.floor(s.t / 60) % 6;
-    const key = dark > 0.01 ? s.districts.map((d) => d.queuesOff).join('') + rot : 'day';
+    const key = dark > 0.01 ? s.districts.map((d) => d.queuesOff + (d.frac > 0.35 ? 'a' : 'b')).join('') + rot + s.objs.filter((o) => o.kind === 'industry').map((o) => ((o.critServed ?? 0) > o.cap * 0.5 ? 1 : 0)).join('') : 'day';
     if (key === this.lightsKey || !this.terrain) return;
     this.lightsKey = key;
     if (key === 'day') return;
@@ -167,7 +194,16 @@ export class Renderer {
       if (d < 0) return true;
       const k = s.districts[d].queuesOff;
       return ((q - rot + 6) % 6) >= k;
-    });
+    }, (x, y) => {
+      // заводи світяться, якщо найближча промзона отримує живлення
+      let best = 1, bd = 1e9;
+      for (const o of s.objs) {
+        if (o.kind !== 'industry') continue;
+        const dd = (o.x - x) ** 2 + (o.y - y) ** 2;
+        if (dd < bd) { bd = dd; best = o.cap > 0 ? (o.critServed ?? 0) / o.cap : 1; }
+      }
+      return bd > 60 * 60 ? true : best > 0.5;
+    }, this.terrain.street, (d) => d < 0 || s.districts[d].frac > 0.35);
     const lc = this.lightsFull.getContext('2d')!;
     lc.clearRect(0, 0, W, H);
     lc.imageSmoothingEnabled = true;
@@ -204,6 +240,7 @@ export class Renderer {
     this.refreshLights(s, dark);
 
     this.drawLines(s, false);
+    this.drawMetro(s, 0);
     this.drawObjects(s, 1);
 
     if (dark > 0.01 && this.nightTerrain) {
@@ -218,6 +255,7 @@ export class Renderer {
       // об’єкти трохи підсвічені, щоб не губилися вночі
       this.drawObjects(s, 0.45 * dark);
       this.drawLines(s, true);
+      this.drawMetro(s, dark);
     }
 
     this.drawFires(s, dark);
@@ -300,10 +338,62 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  /** Метро: лінії, станції (світяться, коли є живлення), поїзди. */
+  private drawMetro(s: GameState, dark: number): void {
+    const ctx = this.ctx;
+    const dt = this.lastT < 0 ? 0 : Math.max(0, Math.min(60, s.t - this.lastT));
+    if (dark === 0) this.lastT = s.t;
+    const m = ((s.t % 1440) + 1440) % 1440;
+    const open = m >= 5 * 60 + 30;
+    const objServed = new Map<string, number>();
+    for (const o of s.objs) if (o.kind === 'metro') objServed.set(o.id, (o.critServed ?? 0) / Math.max(0.01, o.cap * (open ? (m / 60 >= 7 && m / 60 < 10) || (m / 60 >= 17 && m / 60 < 20) ? 1.1 : 0.9 : 0.2)));
+    const powered = (id: string) => (objServed.get(id) ?? 1) > 0.85;
+    for (const g of this.metro) {
+      // лінія
+      ctx.globalAlpha = dark > 0 ? 0.55 : 0.8;
+      ctx.strokeStyle = g.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      g.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // станції
+      g.pts.forEach(([x, y], i) => {
+        const on = powered(g.objOf[i]);
+        ctx.fillStyle = on ? g.color : g.dark;
+        ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3);
+        ctx.fillStyle = on ? (dark > 0.3 ? '#fff6d0' : '#ffffff') : '#2a2e3a';
+        ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      });
+      if (dark > 0) continue;
+      // поїзди
+      for (const tr of g.trains) {
+        // сегмент, де зараз поїзд
+        let k = 0;
+        while (k < g.cum.length - 2 && g.cum[k + 1] < tr.d) k++;
+        const segOn = open && powered(g.objOf[k]) && powered(g.objOf[k + 1]);
+        if (segOn) {
+          tr.d += tr.dir * dt * 7;
+          if (tr.d >= g.len) { tr.d = g.len; tr.dir = -1; }
+          if (tr.d <= 0) { tr.d = 0; tr.dir = 1; }
+        }
+        if (!open) continue;
+        const f = (tr.d - g.cum[k]) / Math.max(0.01, g.cum[k + 1] - g.cum[k]);
+        const x = g.pts[k][0] + (g.pts[k + 1][0] - g.pts[k][0]) * f, y = g.pts[k][1] + (g.pts[k + 1][1] - g.pts[k][1]) * f;
+        const blink = !segOn && Math.floor(this.time * 3) % 2 === 0;
+        ctx.fillStyle = blink ? '#e63946' : '#f4f6fb';
+        ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
+        ctx.fillStyle = g.color;
+        ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+    }
+  }
+
   private drawObjects(s: GameState, alpha: number): void {
     const ctx = this.ctx;
     const glowPass = alpha < 1;
     for (const o of s.objs) {
+      if (o.kind === 'metro') continue;
       const spr = this.bank.plain[spriteFor(o)];
       if (!spr) continue;
       const x = Math.round(o.x - spr.width / 2), y = Math.round(o.y - spr.height / 2);
@@ -316,6 +406,20 @@ export class Renderer {
         ctx.fillStyle = `rgba(255,80,60,${hf})`;
         ctx.fillRect(x - 1, y - 1, spr.width + 2, spr.height + 2);
       }
+      if (o.kind === 'wes' && o.built) {
+        const a = this.time * (0.5 + 4 * (s.flags.wind ?? 0.5)) * (o.hp > o.maxHp * 0.25 ? 1 : 0);
+        ctx.strokeStyle = '#e8ecf2';
+        ctx.lineWidth = 0.7;
+        const hx = o.x, hy = y + 1;
+        for (let k = 0; k < 3; k++) {
+          const b = a + (k * Math.PI * 2) / 3;
+          ctx.beginPath();
+          ctx.moveTo(hx, hy);
+          ctx.lineTo(hx + Math.cos(b) * 5, hy + Math.sin(b) * 5);
+          ctx.stroke();
+        }
+      }
+      if (o.kind === 'wte' && o.built && o.out > 0.5 && !this.lowFx && Math.random() < 0.06) this.puff(o.x + 3, o.y - 5, '#cfd3db', 3);
       // дим із труб
       if (o.built && (o.kind === 'tpp' || o.kind === 'tes') && o.out > 5 && !this.lowFx && Math.random() < 0.08) {
         for (const [dx, dy] of SMOKE_POINTS[o.kind]) {
@@ -729,12 +833,16 @@ export class Renderer {
     if (best) return best;
     bd = 9;
     for (const o of s.objs) {
+      if (o.kind === 'metro') continue;
       const spr = this.bank.plain[spriteFor(o)];
       const r = spr ? Math.max(spr.width, spr.height) / 2 + 2 : 5;
       const dd = Math.hypot(o.x - wx, o.y - wy);
       if (dd < Math.min(r, bd)) { bd = dd; best = { kind: 'obj', id: o.id }; }
     }
     if (best) return best;
+    for (const g of this.metro) {
+      for (const [x, y] of g.pts) if (Math.hypot(x - wx, y - wy) < 3) return { kind: 'metro', id: g.id };
+    }
     bd = 5;
     for (const c of s.crews) {
       if (c.state === 'injured') continue;

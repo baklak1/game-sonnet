@@ -13,7 +13,7 @@ export function distributedMW(s: GameState, onlyBess = false): number {
   let mw = 0;
   for (const o of s.objs) {
     if (!o.built) continue;
-    if (onlyBess ? o.kind === 'bess' : o.kind === 'kgu' || o.kind === 'gtu' || o.kind === 'ses' || o.kind === 'bess') mw += o.cap;
+    if (onlyBess ? o.kind === 'bess' : o.kind === 'kgu' || o.kind === 'gtu' || o.kind === 'ses' || o.kind === 'bess' || o.kind === 'wes') mw += o.cap;
   }
   return mw;
 }

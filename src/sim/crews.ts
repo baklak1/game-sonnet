@@ -72,7 +72,7 @@ export function findPath(x0: number, y0: number, x1: number, y1: number): number
         const p = g.pass[ni];
         if (p === 0 && ni !== goal) continue;
         if (dx && dy && (g.pass[cy * TW + nx] === 0 || g.pass[ny * TW + cx] === 0)) continue;
-        const cost = (dx && dy ? 1.414 : 1) * (p === 2 ? 0.8 : 1);
+        const cost = (dx && dy ? 1.414 : 1) * (p === 2 ? 0.8 : p === 3 ? 0.55 : 1);
         const ng = gScore[cur] + cost;
         if (ng < gScore[ni]) {
           gScore[ni] = ng;

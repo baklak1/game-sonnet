@@ -4,7 +4,8 @@ import { levelById } from '../data/levels';
 import { AMMO_NAMES, AMMO_PACK, BUILDS, CREWS, DEFS, LINE_SPECS, PROT_NAMES, TECHS, THREATS, protClass } from '../data/specs';
 import { DIR_NAMES } from '../data/mapData';
 import type { AmmoType, DefType, GameState, PObj, WavePolicy } from '../sim/types';
-import { availableGen, importMult, objAvail } from '../sim/grid';
+import { availableGen, importMult, industryFactor, objAvail } from '../sim/grid';
+import { METRO_LINES } from '../data/metro';
 import { ammoPackCost, buildCost, buildDays, F16_COST, f16Available, fmtMoney, maxContractors, projectCost, protQuote, transformerPrice } from '../sim/actions';
 import { needsProject } from '../sim/crews';
 import { crewPeople } from '../sim/init';
@@ -20,6 +21,7 @@ const KIND_NAMES: Record<string, string> = {
   import: 'Міжрегіональний перетік', kgu: 'Когенераційна установка', gtu: 'Газотурбінна установка', ses: 'Сонячна станція',
   bess: 'Система накопичення енергії', boiler: 'Модульна котельня', pn: 'Пункт незламності', base: 'База ремонтних бригад',
   depot: 'Склад обладнання', decoy: 'Макет-приманка', crit: 'Критичний споживач',
+  metro: 'Тягова підстанція метро', industry: 'Промислова зона (бізнес-тариф)', wte: 'Сміттєспалювальна ТЕЦ', wes: 'Вітрова електростанція',
 };
 
 const POLICY_NAMES: Record<WavePolicy, string> = {
@@ -40,7 +42,7 @@ const mw = (v: number) => `${Math.round(v)} МВт`;
 export function buildPanel(s: GameState, tab: string): string {
   const tabs: [string, string][] = [['gen', 'Генерація'], ['grid', 'Мережа'], ['sup', 'Підтримка']];
   const lists: Record<string, string[]> = {
-    gen: ['kgu', 'gtu', 'ses', 'bess', 'boiler'],
+    gen: ['kgu', 'gtu', 'ses', 'wes', 'bess', 'boiler'],
     grid: ['sub110', 'line110', 'cable110', 'line330', 'sub330'],
     sup: ['pn', 'base', 'depot', 'decoy'],
   };
@@ -125,7 +127,18 @@ export function gridPanel(s: GameState, gridOverlay: boolean): string {
     ${row('Імпорт з АЕС', `${mw(s.importUsed)} з ${mw(Math.min(999, s.importBase * importMult(s)))}`)}
     ${limited ? `<p><span class="tag bad">Ліміт Укренерго: ${Math.round((s.flags.limitFrac ?? 1) * 100)}% попиту ще ${Math.ceil(((s.flags.limitUntil ?? 0) - s.t) / 60)} год</span></p>` : ''}
     ${row('Вода ГЕС на добу', `${Math.round(s.flags.hppLeft ?? 0)} МВт·год`)}
+    ${row('Вітер', `${Math.round((s.flags.wind ?? 0.5) * 100)}%`)}
     ${stor}
+    <h3>Метро</h3>${METRO_LINES.map((l) => {
+      const parts = s.objs.filter((o) => o.kind === 'metro' && o.id.startsWith(`metro_${l.id}_`));
+      const need = parts.reduce((a, o) => a + o.cap, 0), got = parts.reduce((a, o) => a + Math.min(o.cap, o.critServed ?? 0), 0);
+      const mm = ((s.t % 1440) + 1440) % 1440;
+      const frac = mm < 330 ? 1 : need ? Math.min(1, got / (need * 0.9)) : 1;
+      return `<button class="item" data-act="selectMetro" data-arg="${l.id}"><span class="t"><b style="color:${l.color}">${l.id} ${l.name}</b></span><span class="price">${mm < 330 ? 'ніч' : Math.round(frac * 100) + '%'}</span></button>`;
+    }).join('')}
+    <h3>Промисловість</h3>
+    ${row('Промзони отримують', `${mw(s.industryServed)}`)}
+    <div class="btns"><button class="${s.flags.indPriority ? 'on' : ''}" data-act="toggleInd">${s.flags.indPriority ? 'Пріоритет: промисловість (більше грошей)' : 'Пріоритет: побут (промзони гасимо першими)'}</button></div>
     <h3>Райони (торкніться, щоб дати пріоритет)</h3>
     <p style="font-size:11px">Дефіцит ділиться чергами. Пріоритетні райони (до двох) вимикаються останніми.</p>
     <div class="list">${d}</div>`;
@@ -207,6 +220,17 @@ export function objPanel(s: GameState, o: PObj): string {
     case 'pn':
       info = '<p>Зменшує злість киян через відключення в районі.</p>';
       break;
+    case 'industry':
+      info = row('Попит зараз', mw(o.cap * industryFactor(s.t))) + row('Отримує', mw(o.critServed ?? 0)) +
+        `<p>Бізнес платить за світло в ${B.businessTariff} раза дорожче, ніж побут. У дефіцит промзони вимикають першими — якщо не дати їм пріоритет у панелі «Мережа».</p>`;
+      break;
+    case 'wte':
+      info = row('Видача', mw(o.out)) + '<p>Палить сміття: електрики мало (~4 МВт), зате дає тепло Позняками й Дніпровському району, навіть коли ТЕЦ вибито.</p>';
+      break;
+    case 'wes':
+      info = row('Вітер', `${Math.round((s.flags.wind ?? 0.5) * 100)}%`) + row('Видача', `${mw(Math.max(0, o.out))} з ${mw(o.cap)}`) +
+        (s.lines.some((l) => (l.a === o.id || l.b === o.id) && l.built) ? '' : '<p><span class="tag bad">Не підключено! Збудуйте ЛЕП 110 кВ до підстанції.</span></p>');
+      break;
   }
   const pq = protQuote(s, o);
   const actions: string[] = [];
@@ -280,6 +304,24 @@ export function districtPanel(s: GameState, id: string): string {
     ${local.length ? local.map((o) => row(o.name, mw(Math.max(0, o.out)))).join('') : '<p>Локальної генерації немає. КГУ чи батарея дадуть району світло навіть без кільця.</p>'}
     <div class="btns" style="flex-direction:column"><button class="${d.priority ? 'on' : ''}" data-act="prioDistrict" data-arg="${d.id}">${d.priority ? 'Зняти пріоритет' : 'Дати пріоритет у графіках'}</button>
     ${s.unlocked.builds.includes('pn') ? `<button data-act="placeBuild" data-arg="pn">Поставити Пункт незламності · ${fmtMoney(BUILDS.pn.cost)}</button>` : ''}</div>`;
+}
+
+export function metroPanel(s: GameState, lineId: string): string {
+  const line = METRO_LINES.find((l) => l.id === lineId);
+  if (!line) return '';
+  const parts = s.objs.filter((o) => o.kind === 'metro' && o.id.startsWith(`metro_${lineId}_`));
+  const m = ((s.t % 1440) + 1440) % 1440;
+  const open = m >= 5 * 60 + 30;
+  const rows = parts.map((o) => {
+    const need = o.cap * (open ? 1 : 0.2);
+    const ok = (o.critServed ?? 0) >= need * 0.85;
+    return `<div class="row"><span class="k">${esc(o.name.replace(/^Метро M\d: /, ''))}</span><b style="color:${ok ? 'var(--good)' : 'var(--bad)'}">${ok ? 'рух є' : 'стоїть'}</b></div>`;
+  }).join('');
+  return `<h2 style="color:${line.color}">${line.id} · ${esc(line.name)}</h2>
+    <p>${line.stations.length} станцій · тягове живлення ~${line.mw} МВт</p>
+    <p>${open ? 'Метро працює.' : 'Нічна перерва: поїзди в депо, станції — укриття.'} Якщо район, через який іде лінія, без світла, поїзди на цій ділянці зупиняються, а кияни дуже злі.</p>
+    <h3>Ділянки по районах</h3>${rows}
+    <p style="font-size:11px">Метро має пріоритет одразу після водоканалу. Дайте району з метро резервне живлення (КГУ, батарея) — і поїзди підуть навіть без кільця.</p>`;
 }
 
 export function forecastHtml(s: GameState): string {

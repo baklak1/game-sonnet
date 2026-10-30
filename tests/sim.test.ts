@@ -36,7 +36,7 @@ describe('гра проходить без помилок', () => {
     it(`${L.id}: перші 3 доби симулюються`, () => {
       const s = newGame(L.id, 'normal', 7);
       for (let i = 0; i < 6000 && !s.over; i++) {
-        step(s, 0.25);
+        step(s, 2.5);
         if (s.choice) s.choice = null;
       }
       expect(Number.isFinite(s.money)).toBe(true);

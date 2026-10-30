@@ -4,9 +4,10 @@ import type { Difficulty } from '../sim/types';
 
 export const B = {
   // ---- час
-  scaleDay: 10,          // хв гри за реальну секунду при ×1 (спокій)
-  scaleAlertIdle: 6,     // тривога, але в небі порожньо
-  scaleTactical: 1.5,    // у небі є цілі
+  // час як у Hearts of Iron: на швидкості 1 одна реальна хвилина = одна година гри
+  scaleBase: 1,          // хв гри за реальну секунду на швидкості 1
+  speeds: [0, 1, 2, 5, 10, 20] as number[],
+  skipScale: 40,         // «До вечора»
   csPerMin: 1 / 1.5,     // бойових секунд на хвилину гри
   dayStartMin: 7 * 60,
   alertMin: 21 * 60,
@@ -58,6 +59,8 @@ export const B = {
   trustCrit: 1.5,
   trustHeat: 0.45,
   trustQuick: 3,
+  trustMetro: 1.2,
+  businessTariff: 1.8,
   pnMitigation: 0.4 / 3,  // за кожен пункт (до 3)
   blackoutFrac: 0.1,
   blackoutHours: 12,

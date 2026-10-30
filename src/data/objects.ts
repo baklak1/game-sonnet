@@ -72,7 +72,7 @@ export const OBJECTS: ObjDef[] = [
   { id: 's_vidradnyi', kind: 'sub110', name: 'ПС 110 кВ «Відрадний»', x: 292, y: 214, cap: 160, hp: 60, district: 'solomianskyi' },
   { id: 's_sviatoshyn', kind: 'sub110', name: 'ПС 110 кВ «Святошин»', x: 252, y: 182, cap: 160, hp: 60, district: 'sviatoshynskyi' },
   { id: 's_borshch', kind: 'sub110', name: 'ПС 110 кВ «Борщагівка»', x: 262, y: 214, cap: 160, hp: 60, district: 'sviatoshynskyi' },
-  { id: 's_troieshchyna', kind: 'sub110', name: 'ПС 110 кВ «Троєщина»', x: 420, y: 148, cap: 160, hp: 60, district: 'desnianskyi' },
+  { id: 's_troieshchyna', kind: 'sub110', name: 'ПС 110 кВ «Троєщина»', x: 418, y: 157, cap: 160, hp: 60, district: 'desnianskyi' },
   { id: 's_lisovyi', kind: 'sub110', name: 'ПС 110 кВ «Лісовий»', x: 446, y: 174, cap: 160, hp: 60, district: 'desnianskyi' },
   { id: 's_voskresenka', kind: 'sub110', name: 'ПС 110 кВ «Воскресенка»', x: 432, y: 188, cap: 160, hp: 60, district: 'dniprovskyi' },
   { id: 's_livoberezhna', kind: 'sub110', name: 'ПС 110 кВ «Лівобережна»', x: 390, y: 204, cap: 160, hp: 60, district: 'dniprovskyi' },
@@ -82,7 +82,14 @@ export const OBJECTS: ObjDef[] = [
   { id: 'c_water_d', kind: 'crit', name: 'Дніпровська водопровідна станція', x: 340, y: 128, cap: 25, hp: 60, district: 'obolonskyi' },
   { id: 'c_water_ds', kind: 'crit', name: 'Деснянська водопровідна станція', x: 440, y: 114, cap: 25, hp: 60, district: 'desnianskyi' },
   { id: 'c_bort', kind: 'crit', name: 'Бортницька станція аерації', x: 440, y: 272, cap: 15, hp: 60, district: 'darnytskyi' },
-  { id: 'c_metro', kind: 'crit', name: 'Метрополітен', x: 332, y: 202, cap: 45, hp: 80, district: 'shevchenkivskyi' },
+  // ---- промзони (бізнес-тариф, найнижчий пріоритет у дефіцит) — реальні промзони з OSM
+  { id: 'i_telychka', kind: 'industry', name: 'Промзона «Теличка»', x: 371, y: 255, cap: 40, hp: 100, district: 'holosiivskyi' },
+  { id: 'i_sviatoshyn', kind: 'industry', name: 'Промзона «Святошин»', x: 268, y: 172, cap: 35, hp: 100, district: 'sviatoshynskyi' },
+  { id: 'i_podil', kind: 'industry', name: 'Промзона «Поділ»', x: 350, y: 171, cap: 25, hp: 100, district: 'podilskyi' },
+  { id: 'i_troieshchyna', kind: 'industry', name: 'Промзона «Троєщина»', x: 440, y: 132, cap: 30, hp: 100, district: 'desnianskyi' },
+  { id: 'i_darnytsia', kind: 'industry', name: 'Промзона «Дарниця»', x: 447, y: 224, cap: 40, hp: 100, district: 'darnytskyi' },
+  // ---- сміттєспалювальна ТЕЦ «Енергія»: переважно тепло для Позняків, турбіна ~4 МВт
+  { id: 'wte', kind: 'wte', name: 'Сміттєспалювальний завод «Енергія»', x: 432, y: 258, cap: 4, hp: 90, district: 'darnytskyi' },
   // ---- бази бригад
   { id: 'base_r', kind: 'base', name: 'База бригад (правий берег)', x: 318, y: 206, cap: 0, hp: 60 },
   { id: 'base_l', kind: 'base', name: 'База бригад (лівий берег)', x: 424, y: 200, cap: 0, hp: 60 },

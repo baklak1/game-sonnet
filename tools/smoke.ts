@@ -7,7 +7,7 @@ const t0 = Date.now();
 let lastDay = 0;
 let steps = 0;
 while (!s.over && s.t < 20 * 1440) {
-  step(s, 0.1);
+  step(s, 1);
   steps++;
   if (s.choice) { s.choice = null; }
   const d = dayOf(s.t);

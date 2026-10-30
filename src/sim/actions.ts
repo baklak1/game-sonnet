@@ -1,7 +1,7 @@
 // Команди гравця. Їх викликають і UI, і бот-балансер. Кожна повертає {ok, msg}.
 import { B } from '../data/balance';
 import { AMMO_PACK, BUILDS, CREWS, DEFS, LINE_SPECS, MAX_LINE_PX, PROT_COST, PROT_DAYS, PROT_NAMES, PX_PER_KM, TECH_BY_ID, WATER_LINE_MULT, protClass } from '../data/specs';
-import { crossesWater, districtAt, isWater, W, H } from './geo';
+import { crossesWater, districtAt, getGeo, isWater, W, H } from './geo';
 import type { AmmoType, BuildJob, CrewType, DefType, FirePolicy, GameState, PObj } from './types';
 import { crewPeople, makeBuiltObj, makeCrew, makeDefense, newId, objById } from './init';
 import { needsProject, sendCrew } from './crews';
@@ -101,6 +101,8 @@ export function buildObject(s: GameState, id: string, x: number, y: number): Res
   if (!pl.ok) return pl;
   const di = districtAt(x, y);
   if (spec.inCity && di < 0) return fail('Це треба ставити в межах міста (у районі)');
+  if (spec.outside && (di >= 0 || getGeo().town[Math.floor(y) * W + Math.floor(x)])) return fail('Вітряки ставлять лише за містом, у полях');
+  if (spec.outside && getGeo().forest[Math.floor(y) * W + Math.floor(x)]) return fail('Тут ліс — оберіть поле');
   if (id === 'pn' && di >= 0) {
     const dist = s.districts[di];
     const inBuild = s.builds.filter((b) => b.kind === 'obj' && b.ref.startsWith('pn_') && objById(s, b.ref)?.district === dist.id).length;
@@ -113,8 +115,8 @@ export function buildObject(s: GameState, id: string, x: number, y: number): Res
   return OK;
 }
 
-const LINE_ENDS_110 = new Set(['sub110', 'sub330', 'tpp', 'tes', 'hpp', 'pspp']);
-const LINE_ENDS_330 = new Set(['sub330', 'sub750', 'tpp', 'tes', 'hpp', 'pspp']);
+const LINE_ENDS_110 = new Set(['sub110', 'sub330', 'tpp', 'tes', 'hpp', 'pspp', 'wes']);
+const LINE_ENDS_330 = new Set(['sub330', 'sub750', 'tpp', 'tes', 'hpp', 'pspp', 'wes']);
 
 export function lineQuote(s: GameState, specId: string, aId: string, bId: string): Res & { cost?: number; days?: number; km?: number; water?: boolean } {
   const spec = LINE_SPECS[specId];
@@ -122,7 +124,7 @@ export function lineQuote(s: GameState, specId: string, aId: string, bId: string
   if (!spec || !a || !b) return fail('Оберіть два об’єкти');
   if (aId === bId) return fail('Оберіть інший кінець');
   const ends = spec.kv === 110 ? LINE_ENDS_110 : LINE_ENDS_330;
-  if (!ends.has(a.kind) || !ends.has(b.kind)) return fail(spec.kv === 110 ? 'ЛЕП 110 з’єднує ПС 110/330 і станції' : 'ЛЕП 330 з’єднує ПС 330/750 і станції');
+  if (!ends.has(a.kind) || !ends.has(b.kind)) return fail(spec.kv === 110 ? 'ЛЕП 110 з’єднує ПС 110/330, станції та ВЕС' : 'ЛЕП 330 з’єднує ПС 330/750, станції та ВЕС');
   if (a.kind === 'sub110' && b.kind === 'sub110' && spec.kv === 330) return fail('Не той клас напруги');
   if (s.lines.some((l) => (l.a === aId && l.b === bId) || (l.a === bId && l.b === aId))) return fail('Така лінія вже є');
   const px = Math.hypot(a.x - b.x, a.y - b.y);

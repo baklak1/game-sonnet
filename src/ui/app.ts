@@ -7,7 +7,7 @@ import { Renderer, spriteFor, type Selection } from '../render/renderer';
 import { iconImg } from '../render/icons';
 import { BUILDS, CREWS, DEFS, LINE_SPECS } from '../data/specs';
 import { LEVELS, levelById } from '../data/levels';
-import { DIFF } from '../data/balance';
+import { B, DIFF } from '../data/balance';
 import { nextNews } from '../data/news';
 import { newGame, skipToEvening, step } from '../sim/sim';
 import { darkness, dayOf, temperature } from '../sim/demand';
@@ -83,7 +83,11 @@ export class App {
     };
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.back();
-      if (e.key === ' ' && this.s) this.togglePause();
+      if (!this.inGame || !this.s) return;
+      if (e.key === ' ') { e.preventDefault(); this.togglePause(); }
+      if (e.key >= '1' && e.key <= '5') this.setSpeed(Number(e.key));
+      if (e.key === '+' || e.key === '=') this.setSpeed(Math.min(5, Math.max(1, B.speeds.indexOf(this.s.speed)) + 1));
+      if (e.key === '-') this.setSpeed(Math.max(1, B.speeds.indexOf(this.s.speed) - 1));
     });
     this.r.onSound = (name, x, y) => this.sound(name, x, y);
     this.demo = newGame('endless', 'easy', 7);
@@ -263,6 +267,14 @@ export class App {
       s.flags.autosave = 0;
       saveRun(s);
     }
+    if (s.flags.alertStarted) {
+      s.flags.alertStarted = 0;
+      if (this.progress.settings.autopause) {
+        s.paused = true;
+        this.updateHud(true);
+        this.showToast({ text: 'Тривога! Гру поставлено на паузу — розставте ППО й оберіть швидкість.', kind: 'warn' });
+      }
+    }
     if (this.tutorial) this.tutorial.update(this, s);
     // модалки
     if ($('modal').classList.contains('hidden')) {
@@ -287,10 +299,12 @@ export class App {
       <div class="stat" id="h_time"></div>
       <div class="phase" id="h_phase"></div></div>
       <div class="speed">
-        <button id="h_s0" data-act="speed" data-arg="0">II</button>
-        <button id="h_s1" data-act="speed" data-arg="1">×1</button>
-        <button id="h_s2" data-act="speed" data-arg="2">×2</button>
-        <button id="h_s4" data-act="speed" data-arg="4">×4</button>
+        <button id="h_s0" data-act="speed" data-arg="0" title="Пауза (пробіл)">II</button>
+        <button id="h_s1" data-act="speed" data-arg="1" title="1 хв = 1 год">1</button>
+        <button id="h_s2" data-act="speed" data-arg="2" title="×2">2</button>
+        <button id="h_s3" data-act="speed" data-arg="3" title="×5">3</button>
+        <button id="h_s4" data-act="speed" data-arg="4" title="×10">4</button>
+        <button id="h_s5" data-act="speed" data-arg="5" title="×20">5</button>
         <button id="h_skip" data-act="skip" title="До вечора">⏭</button>
         <button data-act="pauseMenu">☰</button>
       </div>`;
@@ -307,7 +321,7 @@ export class App {
     const dark = darkness(s) > 0.5;
     const alert = s.phase === 'alert' || s.threats.length > 0;
     const phase = alert ? ['alert', 'ТРИВОГА'] : dark ? ['night', 'НІЧ'] : ['day', 'ДЕНЬ'];
-    const sp = s.paused ? 0 : s.speed;
+    const sp = s.paused ? 0 : Math.max(1, B.speeds.indexOf(s.speed));
     const set = (id: string, text: string) => { const e = $(id); if (e.textContent !== text) e.textContent = text; };
     set('h_money', A.fmtMoney(s.money));
     set('h_served', String(Math.round(s.servedTotal)));
@@ -324,7 +338,7 @@ export class App {
     const ph = $('h_phase');
     set('h_phase', phase[1]);
     if (ph.className !== `phase ${phase[0]}`) ph.className = `phase ${phase[0]}`;
-    for (const v of [0, 1, 2, 4]) $('h_s' + v).classList.toggle('on', sp === v);
+    for (const v of [0, 1, 2, 3, 4, 5]) $('h_s' + v).classList.toggle('on', sp === v);
     ($('h_skip') as HTMLButtonElement).disabled = alert;
     const fc = P.forecastHtml(s);
     const fe = $('forecast');
@@ -409,6 +423,7 @@ export class App {
         } else if (sel.kind === 'def') html = P.defPanel(s, sel.id);
         else if (sel.kind === 'crew') html = P.crewPanel(s, sel.id);
         else if (sel.kind === 'line') html = P.linePanel(s, sel.id);
+        else if (sel.kind === 'metro') html = P.metroPanel(s, sel.id);
         else html = P.districtPanel(s, sel.id);
         if (!html) { this.closePanel(); return; }
         break;
@@ -653,7 +668,7 @@ export class App {
       case 'retry': if (s) { clearRun(); this.chosenDiff = s.difficulty; this.startLevel(s.levelId); } break;
       case 'toMenu': this.toMenu(); break;
       // HUD
-      case 'speed': if (s) { const v = Number(arg); if (v === 0) s.paused = true; else { s.paused = false; s.speed = v; } this.updateHud(true); } break;
+      case 'speed': if (s) this.setSpeed(Number(arg)); break;
       case 'skip': if (s) { s.paused = false; skipToEvening(s); } break;
       case 'pauseMenu': this.showPauseMenu(); break;
       case 'resume': this.closeModal(); if (s) s.paused = false; break;
@@ -697,6 +712,8 @@ export class App {
       // мережа
       case 'selectDistrict': { const d = s?.districts.find((dd) => dd.id === arg); if (d) { this.cam.focus(d.cx, d.cy); this.select({ kind: 'district', id: d.id }); } break; }
       case 'prioDistrict': if (s) this.feedback(A.togglePriority(s, arg)); break;
+      case 'selectMetro': this.select({ kind: 'metro', id: arg }); break;
+      case 'toggleInd': if (s) { s.flags.indPriority = s.flags.indPriority ? 0 : 1; s.gridDirty = true; this.renderPanel(); } break;
       case 'research': if (s) this.feedback(A.research(s, arg), 'Технологію впроваджено'); break;
       // модалки
       case 'choice': if (s) { applyChoice(s, arg); this.closeModal(); } break;
@@ -747,6 +764,18 @@ export class App {
     if (a) a.exit();
   }
 
+  /** Рівні швидкості як у Hearts of Iron: 0 — пауза, 1..5 — ×1, ×2, ×5, ×10, ×20. */
+  setSpeed(level: number): void {
+    const s = this.s;
+    if (!s) return;
+    if (level <= 0) s.paused = true;
+    else {
+      s.paused = false;
+      s.speed = B.speeds[Math.min(5, level)];
+    }
+    this.updateHud(true);
+  }
+
   togglePause(): void {
     if (!this.s) return;
     this.s.paused = !this.s.paused;
@@ -773,6 +802,7 @@ export class App {
       <div class="menu-btns">
         <button class="primary" data-act="resume">Продовжити</button>
         <button class="${st.sound ? 'on' : ''}" data-act="toggleSetting" data-arg="sound">Звук: ${st.sound ? 'увімк.' : 'вимк.'}</button>
+        <button class="${st.autopause ? 'on' : ''}" data-act="toggleSetting" data-arg="autopause">Пауза на тривогу: ${st.autopause ? 'так' : 'ні'}</button>
         <button class="${st.lowFx ? 'on' : ''}" data-act="toggleSetting" data-arg="lowFx">Економія батареї: ${st.lowFx ? 'так' : 'ні'}</button>
         <button data-act="quitToMenu">Зберегти й вийти в меню</button>
       </div>`);

@@ -37,11 +37,10 @@ function morningGifts(s: GameState, day: number): void {
   }
 }
 
+/** Хвилин гри за реальну секунду без урахування швидкості гравця. */
 export function timeScale(s: GameState): number {
-  if (s.threats.length > 0 || s.projs.length > 0) return B.scaleTactical;
-  if (s.phase === 'alert') return B.scaleAlertIdle;
-  if (s.flags.skip) return B.scaleDay * 6;
-  return B.scaleDay;
+  if (s.flags.skip) return B.skipScale / Math.max(1, s.speed);
+  return B.scaleBase;
 }
 
 export function step(s: GameState, dtReal: number): void {
@@ -61,11 +60,13 @@ export function step(s: GameState, dtReal: number): void {
 
 function startAlert(s: GameState): void {
   s.phase = 'alert';
+  s.flags.alertStarted = 1;
   s.waveStats = { launched: 0, downed: 0, hits: 0, missilesSpent: 0, adCost: 0, mwLost: 0 };
   s.fx.push({ t: 'siren', on: true });
   reloadAll(s);
   const w = waveForDay(s, dayOf(s.t));
   toast(s, `Повітряна тривога!${w?.title ? ' ' + w.title + '.' : ''} Ворог атакує енергетику.`, 'bad');
+  if (rnd(s) < 0.5) news(s, 'Кияни спускаються в метро: станції працюють як укриття');
   s.flags.skip = 0;
 }
 
@@ -90,6 +91,10 @@ function onHour(s: GameState, tHour: number): void {
   const m = minuteOfDay(tHour);
   hourly(s);
   processDeliveries(s);
+  // вітер: випадкове блукання навколо сезонного середнього
+  const windMean = s.season === 'winter' ? 0.55 : s.season === 'autumn' ? 0.5 : s.season === 'spring' ? 0.45 : 0.32;
+  s.flags.wind = Math.max(0.05, Math.min(1, (s.flags.wind ?? 0.5) + (windMean - (s.flags.wind ?? 0.5)) * 0.15 + (rnd(s) - 0.5) * 0.18));
+  if (s.objs.some((o) => o.kind === 'wes')) s.gridDirty = true;
   s.tempMods = s.tempMods.filter((t) => t.until > s.t);
   s.importMods = s.importMods.filter((t) => t.until > s.t);
   if (s.flags.promiseAt && s.t >= s.flags.promiseAt) {

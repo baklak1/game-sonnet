@@ -10,7 +10,7 @@ export type ObjKind =
   | 'sub750' | 'sub330' | 'sub110' | 'import'
   | 'kgu' | 'gtu' | 'ses' | 'bess' | 'boiler'
   | 'pn' | 'base' | 'depot' | 'decoy'
-  | 'crit';
+  | 'crit' | 'metro' | 'industry' | 'wte' | 'wes';
 
 export type DefType = 'mfg' | 'manpads' | 'gepard' | 'interceptor' | 'ew' | 'radar' | 'nasams' | 'irist' | 'patriot';
 export type AmmoType = 'manpads' | 'gepard' | 'interceptor' | 'nasams' | 'irist' | 'patriot';
@@ -287,6 +287,8 @@ export interface GameState {
   demandTotal: number;
   servedTotal: number;
   importUsed: number;
+  /** Отримано промзонами (бізнес-тариф) і метро, МВт. */
+  industryServed: number;
 
   fx: FxEvent[];
   toasts: Toast[];

@@ -113,6 +113,7 @@ export interface BuildSpec {
   cap: number;
   hp: number;
   inCity: boolean;
+  outside?: boolean;
   socMax?: number;
   desc: string;
 }
@@ -128,6 +129,7 @@ export const BUILDS: Record<string, BuildSpec> = {
   sub330: { id: 'sub330', kind: 'sub330', name: 'Підстанція 330 кВ', cost: 300, days: 8, cap: 800, hp: 160, inCity: false, desc: 'Новий вузол кільця. Підключіть ЛЕП 330 кВ.' },
   base: { id: 'base', kind: 'base', name: 'База бригад', cost: 30, days: 2, cap: 0, hp: 60, inCity: false, desc: 'Бригади відпочивають і стартують звідси. Ставте на іншому березі.' },
   depot: { id: 'depot', kind: 'depot', name: 'Склад обладнання', cost: 40, days: 2, cap: 0, hp: 60, inCity: false, desc: '+2 трансформатори одразу, дешевші поставки.' },
+  wes: { id: 'wes', kind: 'wes', name: 'Вітрова електростанція', cost: 100, days: 4, cap: 30, hp: 50, inCity: false, outside: true, desc: 'До 30 МВт залежно від вітру. Лише за містом, у полях. Потрібна ЛЕП 110 кВ до підстанції.' },
   decoy: { id: 'decoy', kind: 'decoy', name: 'Макет підстанції', cost: 3, days: 0.5, cap: 0, hp: 20, inCity: false, desc: 'Приманка. Якщо ворог не мав розвідки, частина дронів полетить сюди.' },
 };
 
@@ -146,7 +148,7 @@ export function protClass(kind: ObjKind): 'plant' | 'sub' | 'sub110' | 'small' |
   if (kind === 'tpp' || kind === 'tes' || kind === 'hpp' || kind === 'pspp') return 'plant';
   if (kind === 'sub750' || kind === 'sub330') return 'sub';
   if (kind === 'sub110') return 'sub110';
-  if (kind === 'kgu' || kind === 'gtu' || kind === 'bess' || kind === 'ses') return 'small';
+  if (kind === 'kgu' || kind === 'gtu' || kind === 'bess' || kind === 'ses' || kind === 'wes' || kind === 'wte') return 'small';
   return null;
 }
 
@@ -163,9 +165,9 @@ export const PROT_MULT: [number, number][] = [[1, 1], [0.7, 0.9], [0.3, 0.65], [
 
 export interface CrewSpec { name: string; short: string; hire: number; people: number; speed: number; fixes: ObjKind[]; lines: number[] }
 export const CREWS: Record<CrewType, CrewSpec> = {
-  city: { name: 'Аварійна бригада ДТЕК', short: 'ДТЕК', hire: 4, people: 5, speed: 10, fixes: ['sub110', 'kgu', 'gtu', 'ses', 'bess', 'boiler', 'pn', 'base', 'depot', 'decoy', 'crit'], lines: [110] },
+  city: { name: 'Аварійна бригада ДТЕК', short: 'ДТЕК', hire: 4, people: 5, speed: 10, fixes: ['sub110', 'kgu', 'gtu', 'ses', 'bess', 'boiler', 'pn', 'base', 'depot', 'decoy', 'crit', 'wes'], lines: [110] },
   hv: { name: 'Високовольтна бригада', short: 'ВН', hire: 8, people: 8, speed: 8, fixes: ['sub330', 'sub750', 'import'], lines: [330, 750] },
-  plant: { name: 'Бригада «Енергоремонт»', short: 'Енергоремонт', hire: 12, people: 12, speed: 5, fixes: ['tpp', 'tes', 'hpp', 'pspp'], lines: [] },
+  plant: { name: 'Бригада «Енергоремонт»', short: 'Енергоремонт', hire: 12, people: 12, speed: 5, fixes: ['tpp', 'tes', 'hpp', 'pspp', 'wte'], lines: [] },
 };
 
 export interface TechSpec { id: string; name: string; cost: number; desc: string }

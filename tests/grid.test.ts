@@ -58,7 +58,9 @@ describe('енергосистема Києва', () => {
     expect(pech.frac).toBeLessThan(0.05);
     s.objs.push({ id: 'k1', kind: 'gtu', name: 'ГТУ', x: 362, y: 222, hp: 70, maxHp: 70, prot: 0, cap: 25, district: 'pecherskyi', built: true, fireUntil: 0, out: 0 });
     dispatch(s);
-    expect(pech.served).toBeGreaterThan(20);
+    const metro = s.objs.filter((o) => o.kind === 'metro' && o.district === 'pecherskyi').reduce((a, o) => a + (o.critServed ?? 0), 0);
+    expect(pech.served + metro).toBeGreaterThan(20);
+    expect(metro).toBeGreaterThan(0);
   });
 
   it('ліміт Укренерго обмежує побутове споживання, але не критичне', () => {

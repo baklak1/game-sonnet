@@ -74,7 +74,21 @@ export class FlowNet {
 
 export function isGen(o: PObj): boolean {
   return o.kind === 'tpp' || o.kind === 'tes' || o.kind === 'hpp' || o.kind === 'pspp' || o.kind === 'import' ||
-    o.kind === 'kgu' || o.kind === 'gtu' || o.kind === 'ses' || o.kind === 'bess';
+    o.kind === 'kgu' || o.kind === 'gtu' || o.kind === 'ses' || o.kind === 'bess' || o.kind === 'wte' || o.kind === 'wes';
+}
+
+/** Попит метро: нічна перерва 00:00–05:30, пікові години трохи вище. */
+export function metroFactor(t: number): number {
+  const m = ((t % 1440) + 1440) % 1440;
+  if (m < 5 * 60 + 30) return 0.2;
+  const h = m / 60;
+  return (h >= 7 && h < 10) || (h >= 17 && h < 20) ? 1.1 : 0.9;
+}
+
+/** Попит промзон: робочий день вище, ніч — половина. */
+export function industryFactor(t: number): number {
+  const h = (((t % 1440) + 1440) % 1440) / 60;
+  return h >= 8 && h < 19 ? 1 : h >= 6 && h < 22 ? 0.8 : 0.5;
 }
 
 export function isSub(o: PObj): boolean {
@@ -82,7 +96,7 @@ export function isSub(o: PObj): boolean {
 }
 
 export function isLocalGen(o: PObj): boolean {
-  return o.kind === 'kgu' || o.kind === 'gtu' || o.kind === 'ses' || o.kind === 'bess';
+  return o.kind === 'kgu' || o.kind === 'gtu' || o.kind === 'ses' || o.kind === 'bess' || o.kind === 'wte';
 }
 
 export function objAvail(o: PObj): number {
@@ -103,6 +117,8 @@ export function availableGen(s: GameState, o: PObj): number {
   const av = objAvail(o) * (o.fireUntil > s.t ? 0.5 : 1);
   switch (o.kind) {
     case 'tpp': case 'tes': return o.cap * av * (s.season === 'summer' ? 0.55 : 1);
+    case 'wte': return o.cap * av;
+    case 'wes': return o.cap * av * Math.max(0.05, s.flags.wind ?? 0.5);
     case 'kgu': case 'gtu': return o.cap * av;
     case 'hpp': return Math.min(o.cap * av, Math.max(0, s.flags.hppLeft ?? 0));
     case 'ses': return o.cap * av * solarFactor(s);
@@ -124,6 +140,7 @@ function genCost(s: GameState, o: PObj): number {
     case 'ses': return c.ses;
     case 'pspp': case 'bess': return isPeakHour(s.t) ? c.storPeak : c.storOff;
     case 'import': return c.edge;
+    case 'wte': case 'wes': return 0;
     case 'sub750': return c.import;
     default: return 1;
   }
@@ -244,11 +261,15 @@ export function dispatch(s: GameState): DispatchResult {
     queueArcs.push(arcs);
   }
   for (const o of s.objs) {
-    if (o.kind !== 'crit' || !o.district) continue;
+    if (!o.district) continue;
+    let dem = 0, value = 0;
+    if (o.kind === 'crit') { dem = o.cap * (0.85 + 0.15 * demandFactor(s)); value = B.critValue; }
+    else if (o.kind === 'metro') { dem = o.cap * metroFactor(s.t); value = 900; }
+    else if (o.kind === 'industry') { dem = o.cap * industryFactor(s.t) * (1 + 0.15 * Math.max(0, demandFactor(s) - 1)); value = s.flags.indPriority ? 105 : 60; }
+    else continue;
     const dn = distNode.get(o.district)!;
-    const dem = o.cap * (0.85 + 0.15 * demandFactor(s));
     demandTotal += dem;
-    critArcs.push({ o, arc: net.addArc(dn, T, dem, -B.critValue) });
+    critArcs.push({ o, arc: net.addArc(dn, o.kind === 'industry' ? sink : T, dem, -value) });
   }
 
   net.solve(S, T);
@@ -288,11 +309,14 @@ export function dispatch(s: GameState): DispatchResult {
     d.queuesOff = Math.max(0, Math.min(6, Math.round((1 - d.frac) * 6)));
     servedTotal += served;
   });
+  let industryServed = 0;
   for (const c of critArcs) {
     c.o.critServed = c.arc.flow;
     c.o.out = c.arc.flow;
     servedTotal += c.arc.flow;
+    if (c.o.kind === 'industry') industryServed += c.arc.flow;
   }
+  s.industryServed = industryServed;
 
   s.genTotal = genTotal;
   s.demandTotal = demandTotal;
@@ -315,10 +339,12 @@ export function updateHeat(s: GameState): void {
     const av = src ? objAvail(src) : 0;
     let cov = av > 0 ? Math.min(1, av + 0.3) * (src && src.fireUntil > s.t ? 0.6 : 1) : 0;
     for (const o of s.objs) {
-      if (o.district !== d.id || !o.built || objAvail(o) === 0) continue;
+      const near = o.district === d.id || (o.kind === 'wte' && d.id === 'dniprovskyi');
+      if (!near || !o.built || objAvail(o) === 0) continue;
       if (o.kind === 'boiler') cov += 0.5;
       else if (o.kind === 'kgu') cov += 0.2;
       else if (o.kind === 'gtu') cov += 0.3;
+      else if (o.kind === 'wte') cov += 0.35;
     }
     d.noHeat = Math.max(0, 1 - Math.min(1, cov));
   }

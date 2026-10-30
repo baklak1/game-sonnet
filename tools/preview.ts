@@ -21,8 +21,11 @@ for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   if (g.town[i]) c = [120, 110, 100];
   const d = g.district[i];
   if (d >= 0) c = pal[d].map((v) => v * 0.45 + 30);
+  if (g.industrial[i]) c = [110, 90, 80];
+  if (g.road[i] === 5) c = [90, 60, 50];
+  else if (g.road[i]) c = [170 + g.road[i] * 0, 170, 170];
   if (g.water[i]) c = [40, 90, 160];
-  if (g.bridge[i]) c = [200, 200, 200];
+  if (g.bridge[i]) c = [255, 255, 255];
   px(x, y, c);
 }
 let bad = 0;

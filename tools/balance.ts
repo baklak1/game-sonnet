@@ -23,7 +23,7 @@ for (const lid of levels) {
       let lastHour = -1;
       let guard = 0;
       while (!s.over && guard++ < 400000) {
-        step(s, 0.25);
+        step(s, 2.5);
         if (s.choice) applyChoice(s, s.choice.options[0].effect);
         const h = Math.floor(s.t / 60);
         if (h !== lastHour) {
