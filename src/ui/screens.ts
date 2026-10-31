@@ -85,6 +85,8 @@ export function howTo(): string {
       <li>Аварійні відключення (раптові) злять киян утричі більше за планові. Батареї ДТЕК закривають такі провали.</li>
       <li>Локальна генерація (КГУ, ГТУ, СЕС, батареї) живить свій район, навіть коли його відрізано від кільця.</li>
     </ul>
+    <h2>Графіки та екстрені відключення</h2>
+    <p>Укренерго надсилає наказ: «Київ споживає не більше N МВт до такої-то години». У вкладці «Графіки» можна лишити автомат або скласти ручний графік: однаково для всього Києва або окремо для кожного району (0–6 черг з 6). Якщо графік не вкладається в ліміт, Укренерго саме застосує аварійні відключення і штраф. Кнопка ⚡ екстрено вимикає район: потужність одразу йде іншим районам, метро й водоканалу, але кияни злі.</p>
     <h2>Оборона</h2>
     <ul>
       <li>МВГ і «Гепарди» — дешево проти шахедів. ЗРК (NASAMS, IRIS-T, Patriot) — дорогі ракети, бережіть їх для ракет.</li>
@@ -113,17 +115,18 @@ export function about(): string {
     <p>Мапа: райони, вулиці, шосе, залізниці, станції метро, вода, парки й промзони — © OpenStreetMap contributors (ODbL), вивантаження BBBike.org.</p>
     <p>Звуки — OpenGameArt.org, CC0: сирена «storm siren» (TinyWorlds), «Synthesized explosion» (qubodup), пакети «50 CC0 Sci-Fi SFX», «100 CC0 SFX», «25 CC0 bang / firework SFX» (rubberduck), «Motor Sound Effect» (EZduzziteh).</p>
     <p>Сміттєспалювальний завод «Енергія», промзони й метро — реальні об’єкти; їхні параметри в грі округлені й умовні.</p>
-    <p>Шрифт Pixelify Sans © The Pixelify Sans Project Authors, SIL Open Font License 1.1.</p>
+    <p>Шрифти: Rubik © The Rubik Project Authors, Pixelify Sans © The Pixelify Sans Project Authors — SIL Open Font License 1.1.</p>
+    <p>Музика (CC0, OpenGameArt): «sector» з Dark Sci-Fi Audio Pack (Ball Logic), «War Theme» (Spring Spring).</p>
     <p>Слава енергетикам, рятувальникам і ППО.</p>
   </div></div>`;
 }
 
 export function settingsMenu(p: Progress): string {
-  const t = (key: keyof Progress['settings'], label: string) =>
+  const t = (key: 'autopause' | 'music' | 'sound' | 'ambient' | 'vibro' | 'lowFx', label: string) =>
     `<button class="${p.settings[key] ? 'on' : ''}" data-act="toggleSetting" data-arg="${key}">${label}: ${p.settings[key] ? 'увімк.' : 'вимк.'}</button>`;
   return `<div class="menu"><div class="topline"><button data-act="back">←</button><h1>Налаштування</h1></div>
   <div class="panel-box pix"><div class="menu-btns">
-    ${t('autopause', 'Пауза на початку тривоги')}${t('sound', 'Звук')}${t('ambient', 'Гул генераторів у темряві')}${t('vibro', 'Вібрація')}${t('lowFx', 'Економія батареї')}
+    ${t('autopause', 'Пауза на початку тривоги')}${t('music', 'Музика')}<button data-act="musicVol">Гучність музики: ${['тихо', 'середньо', 'гучно'][p.settings.musicVol - 1]}</button>${t('sound', 'Звук')}${t('ambient', 'Гул генераторів у темряві')}${t('vibro', 'Вібрація')}${t('lowFx', 'Економія батареї')}
     <button class="danger" data-act="resetAll">Скинути прогрес</button>
   </div></div></div>`;
 }

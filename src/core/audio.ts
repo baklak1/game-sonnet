@@ -21,6 +21,8 @@ import boom2Url from '../assets/sfx/boom2.ogg';
 import boomFarUrl from '../assets/sfx/boom_far.ogg';
 import kill2Url from '../assets/sfx/kill2.ogg';
 import repairUrl from '../assets/sfx/repair.ogg';
+import musicDayUrl from '../assets/music/day.ogg';
+import musicAlertUrl from '../assets/music/alert.ogg';
 
 const URLS: Record<string, string> = {
   siren: sirenUrl, allclear: allclearUrl, boom: boomUrl, bigboom: bigboomUrl, kill: killUrl, pop: popUrl,
@@ -62,6 +64,12 @@ export class Sfx {
   private genGain: GainNode | null = null;
   private loopsStarted = false;
   private sirenUntil = 0;
+  music = true;
+  musicVolume = 0.6;
+  private musicGain: GainNode | null = null;
+  private musicBufs: Record<string, AudioBuffer> = {};
+  private musicSrc: { name: string; src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  private wantMusic: 'day' | 'alert' | 'off' = 'day';
 
   unlock(): void {
     if (!this.ctx) {
@@ -75,7 +83,10 @@ export class Sfx {
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      void this.loadAll();
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = this.music ? this.musicVolume * 0.5 : 0;
+      this.musicGain.connect(this.ctx.destination);
+      void this.loadAll().then(() => this.loadMusic());
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -91,6 +102,59 @@ export class Sfx {
       }
     }));
     this.startLoops();
+  }
+
+  private async loadMusic(): Promise<void> {
+    const ctx = this.ctx!;
+    for (const [name, url] of [['day', musicDayUrl], ['alert', musicAlertUrl]] as const) {
+      try {
+        const data = await toArrayBuffer(url);
+        this.musicBufs[name] = await new Promise<AudioBuffer>((res, rej) => ctx.decodeAudioData(data, res, rej));
+      } catch {
+        /* без музики */
+      }
+    }
+    this.applyMusic();
+  }
+
+  /** Фонова музика: спокійна вдень, тривожна під час атаки; перехід 3 с. */
+  setMusic(name: 'day' | 'alert' | 'off'): void {
+    if (this.wantMusic === name) return;
+    this.wantMusic = name;
+    this.applyMusic();
+  }
+
+  setMusicEnabled(on: boolean, volume = this.musicVolume): void {
+    this.music = on;
+    this.musicVolume = volume;
+    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(on ? volume * 0.5 : 0, this.ctx.currentTime, 0.3);
+    this.applyMusic();
+  }
+
+  private applyMusic(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicGain) return;
+    const name = this.music ? this.wantMusic : 'off';
+    if (this.musicSrc?.name === name) return;
+    const t = ctx.currentTime;
+    if (this.musicSrc) {
+      const old = this.musicSrc;
+      old.gain.gain.setTargetAtTime(0, t, 0.8);
+      old.src.stop(t + 4);
+      this.musicSrc = null;
+    }
+    const buf = name !== 'off' ? this.musicBufs[name] : undefined;
+    if (!buf) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.setTargetAtTime(1, t, 1);
+    src.connect(g);
+    g.connect(this.musicGain);
+    src.start(t + 0.05);
+    this.musicSrc = { name, src, gain: g };
   }
 
   private startLoops(): void {

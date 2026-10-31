@@ -5,7 +5,7 @@ import { step } from './sim/sim';
 async function boot(): Promise<void> {
   try {
     await Promise.race([
-      Promise.all([document.fonts.load('12px "Pixelify Sans"'), document.fonts.load('12px "Pixelify Sans"', 'Світло є ґїєі')]),
+      Promise.all([document.fonts.load('12px "Pixelify Sans"', 'ДТЕК СВІТЛО Є'), document.fonts.load('600 12px "Rubik"', 'Світло є ґїєі Kyiv')]),
       new Promise((r) => setTimeout(r, 1500)),
     ]);
   } catch {

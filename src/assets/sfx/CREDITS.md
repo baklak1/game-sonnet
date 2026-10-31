@@ -11,3 +11,14 @@
 | allclear.ogg, click.ogg, build.ogg | [100 CC0 SFX](https://opengameart.org/content/100-cc0-sfx) | rubberduck | CC0 |
 | mg.ogg, gepard.ogg, kill.ogg, pop.ogg | [25 CC0 bang / firework SFX](https://opengameart.org/content/25-cc0-bang-firework-sfx) | rubberduck | CC0 |
 | drone_loop.ogg, interceptor.ogg | [Motor Sound Effect](https://opengameart.org/content/motor-sound-effect) | EZduzziteh | CC0 |
+
+## Музика
+
+| Файл | Джерело | Автор | Ліцензія |
+|---|---|---|---|
+| music/day.ogg | «sector» з [Dark Sci-Fi Audio Pack](https://opengameart.org/node/188336) | Ball Logic | CC0 |
+| music/alert.ogg | [War Theme](https://opengameart.org/content/war-theme) (перші 2 хв) | Spring Spring | CC0 |
+
+## Шрифти
+
+Rubik і Pixelify Sans — SIL Open Font License 1.1 (`src/assets/fonts/OFL-*.txt`).

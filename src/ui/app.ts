@@ -28,7 +28,7 @@ type Mode =
   | { t: 'assign'; crewId: number }
   | { t: 'f16' };
 
-type PanelKind = 'build' | 'def' | 'crews' | 'grid' | 'tech' | 'hq' | 'sel' | null;
+type PanelKind = 'build' | 'def' | 'crews' | 'grid' | 'sched' | 'tech' | 'hq' | 'sel' | null;
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -103,7 +103,7 @@ export class App {
         <div id="topbar"></div>
         <div id="toolbar">
           ${this.toolBtn('build', 'build', 'Будувати')}${this.toolBtn('def', 'shield', 'ППО')}${this.toolBtn('crews', 'crew', 'Бригади')}
-          ${this.toolBtn('grid', 'bolt', 'Мережа')}${this.toolBtn('tech', 'tech', 'Техн.')}${this.toolBtn('hq', 'hq', 'Штаб')}
+          ${this.toolBtn('grid', 'bolt', 'Мережа')}${this.toolBtn('sched', 'bulb', 'Графіки')}${this.toolBtn('tech', 'tech', 'Техн.')}${this.toolBtn('hq', 'hq', 'Штаб')}
         </div>
         <div id="panel" class="pix hidden"></div>
         <div id="toasts"></div>
@@ -137,6 +137,7 @@ export class App {
     const st = this.progress.settings;
     sfx.enabled = st.sound;
     sfx.ambient = st.ambient;
+    sfx.setMusicEnabled(st.music, [0.3, 0.6, 1][st.musicVol - 1] ?? 0.6);
     this.r.lowFx = st.lowFx;
   }
 
@@ -320,6 +321,7 @@ export class App {
     const tcol = s.trust >= 60 ? '#a7f3c0' : s.trust >= 30 ? '#ffe08a' : '#ff8a94';
     const dark = darkness(s) > 0.5;
     const alert = s.phase === 'alert' || s.threats.length > 0;
+    sfx.setMusic(s.over ? 'day' : alert ? 'alert' : 'day');
     const phase = alert ? ['alert', 'ТРИВОГА'] : dark ? ['night', 'НІЧ'] : ['day', 'ДЕНЬ'];
     const sp = s.paused ? 0 : Math.max(1, B.speeds.indexOf(s.speed));
     const set = (id: string, text: string) => { const e = $(id); if (e.textContent !== text) e.textContent = text; };
@@ -347,7 +349,7 @@ export class App {
       fe.dataset.h = fc;
     }
     fe.classList.toggle('hidden', !fc || this.panel !== null);
-    for (const k of ['build', 'def', 'crews', 'grid', 'tech', 'hq']) $('tb_' + k).classList.toggle('on', this.panel === k);
+    for (const k of ['build', 'def', 'crews', 'grid', 'sched', 'tech', 'hq']) $('tb_' + k).classList.toggle('on', this.panel === k);
   }
 
   showToast(t: { text: string; kind: string; obj?: string }): void {
@@ -411,6 +413,7 @@ export class App {
       case 'def': html = P.defensePanel(s, this.r.overlay === 'ad'); break;
       case 'crews': html = P.crewsPanel(s); break;
       case 'grid': html = P.gridPanel(s, this.r.overlay === 'grid'); break;
+      case 'sched': html = P.schedulePanel(s); break;
       case 'tech': html = P.techPanel(s); break;
       case 'hq': html = P.hqPanel(s); break;
       case 'sel': {
@@ -648,9 +651,17 @@ export class App {
         }
         break;
       }
+      case 'musicVol': {
+        this.progress.settings.musicVol = (this.progress.settings.musicVol % 3) + 1;
+        saveProgress(this.progress);
+        this.applySettings();
+        if ($('modal').classList.contains('hidden')) this.showScreen('settings', false);
+        else this.showPauseMenu();
+        break;
+      }
       case 'toggleSetting': {
-        const k = arg as keyof Progress['settings'];
-        this.progress.settings[k] = !this.progress.settings[k];
+        const st = this.progress.settings as unknown as Record<string, boolean>;
+        st[arg] = !st[arg];
         saveProgress(this.progress);
         this.applySettings();
         this.resize();
@@ -676,6 +687,7 @@ export class App {
       case 'closePanel': this.closePanel(); break;
       case 'buildTab': this.buildTab = arg; this.renderPanel(); break;
       case 'focusObj': {
+        if (arg === '#sched') { this.cancelMode(); this.panel = null; this.openPanel('sched'); break; }
         const o = s?.objs.find((oo) => oo.id === arg);
         if (o) { this.cam.focus(o.x, o.y); this.select({ kind: 'obj', id: o.id }); }
         break;
@@ -712,6 +724,12 @@ export class App {
       // мережа
       case 'selectDistrict': { const d = s?.districts.find((dd) => dd.id === arg); if (d) { this.cam.focus(d.cx, d.cy); this.select({ kind: 'district', id: d.id }); } break; }
       case 'prioDistrict': if (s) this.feedback(A.togglePriority(s, arg)); break;
+      case 'schedMode': if (s) { A.setScheduleMode(s, arg as 'auto' | 'manual'); this.panelTimer = 0; } break;
+      case 'schedAll': if (s) { A.setAllQueues(s, Number(arg)); this.panelTimer = 0; } break;
+      case 'schedD': if (s) { const [id, dk] = arg.split(':'); A.setDistrictQueues(s, id, (s.schedule.mode === 'manual' ? s.schedule.queues[id] ?? 0 : 0) + Number(dk)); this.panelTimer = 0; } break;
+      case 'schedFit': if (s) { const r = A.autoFitSchedule(s); if (r.msg) s.toasts.push({ text: r.msg, kind: r.ok ? 'info' : 'warn' }); this.panelTimer = 0; } break;
+      case 'emerg': if (s) { A.toggleEmergency(s, arg); this.panelTimer = 0; } break;
+      case 'indOff': if (s) { A.toggleIndustryOff(s); this.panelTimer = 0; } break;
       case 'selectMetro': this.select({ kind: 'metro', id: arg }); break;
       case 'toggleInd': if (s) { s.flags.indPriority = s.flags.indPriority ? 0 : 1; s.gridDirty = true; this.renderPanel(); } break;
       case 'research': if (s) this.feedback(A.research(s, arg), 'Технологію впроваджено'); break;
@@ -736,6 +754,7 @@ export class App {
 
   toMenu(): void {
     this.inGame = false;
+    sfx.setMusic('day');
     this.cancelMode();
     this.closePanel();
     $('tutor').classList.add('hidden');
@@ -802,6 +821,8 @@ export class App {
       <div class="menu-btns">
         <button class="primary" data-act="resume">Продовжити</button>
         <button class="${st.sound ? 'on' : ''}" data-act="toggleSetting" data-arg="sound">Звук: ${st.sound ? 'увімк.' : 'вимк.'}</button>
+        <button class="${st.music ? 'on' : ''}" data-act="toggleSetting" data-arg="music">Музика: ${st.music ? 'увімк.' : 'вимк.'}</button>
+        <button data-act="musicVol">Гучність музики: ${['тихо', 'середньо', 'гучно'][st.musicVol - 1]}</button>
         <button class="${st.autopause ? 'on' : ''}" data-act="toggleSetting" data-arg="autopause">Пауза на тривогу: ${st.autopause ? 'так' : 'ні'}</button>
         <button class="${st.lowFx ? 'on' : ''}" data-act="toggleSetting" data-arg="lowFx">Економія батареї: ${st.lowFx ? 'так' : 'ні'}</button>
         <button data-act="quitToMenu">Зберегти й вийти в меню</button>

@@ -278,6 +278,10 @@ export interface GameState {
   lastWaveReport: (WaveStats & { day: number }) | null;
   forecast: { drones: number; missiles: number; ballistic: number; dirs: string[]; policy: WavePolicy; day: number } | null;
 
+  /** Графіки відключень: автомат або ручні черги по районах (0..6 вимкнено). */
+  schedule: { mode: 'auto' | 'manual'; queues: Record<string, number> };
+  /** Райони, екстрено знеструмлені вручну. */
+  emergencyOff: string[];
   autoRepair: boolean;
   crewRisk: boolean;
 

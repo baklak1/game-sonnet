@@ -2,7 +2,7 @@
 import { B, DIFF } from '../data/balance';
 import { CREWS, DEFS } from '../data/specs';
 import { isHeatingSeason } from './demand';
-import { metroFactor as metroFactorNow } from './grid';
+import { limitMW, metroFactor as metroFactorNow, plannedMW } from './grid';
 import type { GameState } from './types';
 import { crewPeople } from './init';
 
@@ -16,6 +16,13 @@ export function toast(s: GameState, text: string, kind: 'info' | 'bad' | 'good' 
 export function news(s: GameState, text: string): void {
   s.news.push(text);
   if (s.news.length > 20) s.news.splice(0, s.news.length - 20);
+}
+
+/** Запланована частка району: за ручним графіком або знімок поточної години. */
+export function planFor(s: GameState, id: string, frac: number): number {
+  if (s.emergencyOff.includes(id)) return s.schedule.mode === 'manual' ? 1 - (s.schedule.queues[id] ?? 0) / 6 : 1;
+  if (s.schedule.mode === 'manual') return 1 - (s.schedule.queues[id] ?? 0) / 6;
+  return frac;
 }
 
 export function collection(s: GameState): number {
@@ -59,11 +66,13 @@ export function hourly(s: GameState): void {
     popAll += w;
     servedW += frac * w;
     heatW += d.noHeat * w;
-    bad += w * (B.trustPlanned * planned * (1 - mit) + B.trustEmerg * emerg * (1 - 0.5 * mit) * (s.tech.ufls ? 0.5 : 1));
+    const autoK = s.schedule.mode === 'auto' && (s.flags.limitUntil ?? 0) > s.t ? 1.1 : 1;
+    const emergK = s.emergencyOff.includes(d.id) && (s.phase === 'alert' || s.threats.length) ? 0.5 : 1;
+    bad += w * (B.trustPlanned * planned * (1 - mit) * autoK + B.trustEmerg * emerg * (1 - 0.5 * mit) * (s.tech.ufls ? 0.5 : 1) * emergK);
     d.accFrac = 0;
     d.accEmerg = 0;
     d.accMin = 0;
-    d.plan = d.frac;
+    d.plan = planFor(s, d.id, d.frac);
   }
   const S = servedW / popAll;
   bad /= popAll;
@@ -113,11 +122,30 @@ export function hourly(s: GameState): void {
     if (s.stats.blackStreak === 6) toast(s, 'Київ майже повністю знеструмлено вже 6 годин! Ще 6 — і кінець.', 'bad');
   } else s.stats.blackStreak = 0;
 
-  // пожежі
+  // наказ Укренерго закінчився — ручний графік знімається, щоб не тримати місто без світла даремно
+  if (s.flags.limitUntil !== undefined && s.flags.limitUntil <= s.t) {
+    delete s.flags.limitUntil;
+    delete s.flags.limitMW;
+    if (s.schedule.mode === 'manual' && Object.values(s.schedule.queues).some((k) => k > 0)) {
+      for (const id of Object.keys(s.schedule.queues)) s.schedule.queues[id] = 0;
+      s.schedule.mode = 'auto';
+      s.gridDirty = true;
+      toast(s, 'Наказ Укренерго завершився: ручний графік знято, мережа знову на автоматі.', 'good', '#sched');
+    }
+  }
+
+  // порушення ліміту Укренерго в ручному режимі
+  if (s.schedule.mode === 'manual' && (s.flags.limitUntil ?? 0) > s.t && plannedMW(s) > limitMW(s) * 1.02) {
+    s.money = Math.max(0, s.money - 2);
+    toast(s, `Перевищено ліміт Укренерго на ${Math.round(plannedMW(s) - limitMW(s))} МВт: застосовано ГАВ і штраф 2 млн. Посильте графік!`, 'bad', '#sched');
+  }
+
+  // пожежі (у екстрено знеструмлених районах підстанції без навантаження горять слабше)
   const fireMul = s.tech.firefight ? 0.5 : 1;
   for (const o of s.objs) {
     if (o.fireUntil > s.t) {
-      o.hp = Math.max(0, o.hp - B.fireDmgPerHour * fireMul);
+      const unloaded = o.district && s.emergencyOff.includes(o.district) ? 0.5 : 1;
+      o.hp = Math.max(0, o.hp - B.fireDmgPerHour * fireMul * unloaded);
       s.gridDirty = true;
     }
   }

@@ -1,7 +1,8 @@
 // Випадкові та сценарні події, вибір гравця.
 import { levelById } from '../data/levels';
 import { rnd, rndInt, pick } from '../core/rng';
-import { dayOf } from './demand';
+import { dayOf, temperature } from './demand';
+import { B } from '../data/balance';
 import type { AmmoType, GameState } from './types';
 import { news, toast } from './economy';
 import { buildObjectFree } from './free';
@@ -147,10 +148,17 @@ export const EVENTS: EventDef[] = [
 
 /** Ліміт споживання від Укренерго через дефіцит в енергосистемі країни. */
 export function ukrLimit(s: GameState, frac: number, hours: number): void {
-  s.flags.limitFrac = Math.min(s.flags.limitUntil && s.flags.limitUntil > s.t ? s.flags.limitFrac ?? 1 : 1, frac);
+  // наказ у МВт від середньодобового попиту побуту й промзон
+  const base = s.districts.reduce((a, d) => a + B.kyivBaseMW * d.share, 0) * (1 + B.tempK * Math.max(0, B.tempRef - temperature(s))) +
+    s.objs.filter((o) => o.kind === 'industry').reduce((a, o) => a + o.cap * 0.8, 0);
+  const mw = Math.round((base * frac) / 10) * 10;
+  const active = (s.flags.limitUntil ?? 0) > s.t;
+  s.flags.limitMW = active ? Math.min(s.flags.limitMW ?? mw, mw) : mw;
+  s.flags.limitFrac = frac;
   s.flags.limitUntil = Math.max(s.flags.limitUntil ?? 0, s.t + hours * 60);
   s.gridDirty = true;
-  toast(s, `Укренерго: через дефіцит в енергосистемі ліміт для Києва — ${Math.round(frac * 100)}% попиту на ${hours} год. Черги відключень неминучі.`, 'warn');
+  const until = Math.floor(((s.flags.limitUntil % 1440) + 1440) % 1440 / 60);
+  toast(s, `Наказ Укренерго: Київ споживає не більше ${s.flags.limitMW} МВт до ${until}:00. Складіть графік відключень (вкладка «Графіки») — або автомат розподілить сам.`, 'warn', '#sched');
   news(s, 'Укренерго запровадило ліміти споживання для регіонів');
 }
 

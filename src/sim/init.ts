@@ -10,7 +10,7 @@ import type { AmmoType, Crew, CrewType, Defense, DefType, Difficulty, DistrictId
 import { prepareDay } from './waves';
 import { dispatch, updateHeat } from './grid';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export function objById(s: GameState, id: string): PObj | undefined {
   for (const o of s.objs) if (o.id === id) return o;
@@ -115,6 +115,7 @@ export function createState(levelId: string, difficulty: Difficulty, seed: numbe
     unlocked: { defs: [...L.unlock.defs], builds: [...L.unlock.builds], prot: L.unlock.prot, techs: [...L.unlock.techs], threats: [...L.unlock.threats] },
     enemyIntel: null,
     waveIndex: 0, waveDays: L.waves.map((w) => w.day), waveStats: null, lastWaveReport: null, forecast: null,
+    schedule: { mode: 'auto', queues: Object.fromEntries(DISTRICTS.map((d) => [d.id, 0])) }, emergencyOff: [],
     autoRepair: true, crewRisk: false,
     gridDirty: true, lastDispatch: -999, genTotal: 0, demandTotal: 0, servedTotal: 0, importUsed: 0, industryServed: 0,
     fx: [], toasts: [], news: [], choice: null,

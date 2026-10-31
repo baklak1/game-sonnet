@@ -775,12 +775,12 @@ export class Renderer {
     if (c) return c;
     c = document.createElement('canvas');
     const ctx = c.getContext('2d')!;
-    ctx.font = `${px}px "Pixelify Sans", monospace`;
+    ctx.font = `600 ${px}px "Rubik", sans-serif`;
     const w = Math.ceil(ctx.measureText(text).width) + 8;
     c.width = w;
     c.height = Math.ceil(px * 1.5);
     const g = c.getContext('2d')!;
-    g.font = `${px}px "Pixelify Sans", monospace`;
+    g.font = `600 ${px}px "Rubik", sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.lineWidth = Math.max(2, px / 4);
@@ -806,8 +806,9 @@ export class Renderer {
         const pct = Math.round(d.frac * 100);
         const col = pct >= 97 ? '#a7f3c0' : pct >= 70 ? '#ffe08a' : pct >= 35 ? '#ffb070' : '#ff7a85';
         put(this.label(d.name, '#e8ecf4', fs), x * dpr, y * dpr - fs * 0.6);
-        const t2 = `💡${pct}%${d.queuesOff > 0 ? ` · ${d.queuesOff}/6 черг` : ''}${d.noHeat > 0.3 ? ' · ❄' : ''}`;
-        put(this.label(t2, col, fs), x * dpr, y * dpr + fs * 0.6);
+        const em = s.emergencyOff.includes(d.id);
+        const t2 = em ? 'ЕКСТРЕНО ВИМКНЕНО' : `💡${pct}%${d.queuesOff > 0 ? ` · ${d.queuesOff}/6 черг` : ''}${d.noHeat > 0.3 ? ' · ❄' : ''}`;
+        put(this.label(t2, em ? '#ff5a68' : col, fs), x * dpr, y * dpr + fs * 0.6);
       }
     }
     if (z >= 3) {

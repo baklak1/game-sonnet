@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { FlowNet, dispatch } from '../src/sim/grid';
+import { FlowNet, dispatch, districtDemand, limitMW, plannedMW } from '../src/sim/grid';
 import { createState, objById } from '../src/sim/init';
+import { autoFitSchedule, setAllQueues, setDistrictQueues, toggleEmergency } from '../src/sim/actions';
+import { economyTick, hourly } from '../src/sim/economy';
 
 describe('FlowNet (min-cost flow з відʼємними вартостями)', () => {
   it('віддає перевагу дешевшому джерелу', () => {
@@ -65,7 +67,8 @@ describe('енергосистема Києва', () => {
 
   it('ліміт Укренерго обмежує побутове споживання, але не критичне', () => {
     const s = createState('c1', 'normal', 1);
-    s.flags.limitFrac = 0.7;
+    s.flags.indOff = 1;
+    s.flags.limitMW = 0.7 * s.districts.reduce((a, d) => a + districtDemand(s, d.share), 0);
     s.flags.limitUntil = s.t + 600;
     dispatch(s);
     const dist = s.districts.reduce((a, d) => a + d.served, 0);
@@ -80,5 +83,79 @@ describe('енергосистема Києва', () => {
     for (const id of ['tec5', 'tec6', 'darn', 'tryp']) objById(s, id)!.hp = 0;
     dispatch(s);
     expect(s.servedTotal / s.demandTotal).toBeLessThan(0.7);
+  });
+});
+
+describe('графіки відключень і екстрені відключення', () => {
+  it('ручний графік: 2 черги з 6 → район отримує ~67%', () => {
+    const s = createState('c1', 'normal', 1);
+    setDistrictQueues(s, 'obolonskyi', 2);
+    dispatch(s);
+    const d = s.districts.find((dd) => dd.id === 'obolonskyi')!;
+    expect(d.frac).toBeCloseTo(4 / 6, 1);
+    for (const o of s.districts.filter((dd) => dd.id !== 'obolonskyi')) expect(o.frac).toBeGreaterThan(0.98);
+  });
+
+  it('графік для всього Києва вимикає однакову частку всюди', () => {
+    const s = createState('c1', 'normal', 1);
+    setAllQueues(s, 3);
+    dispatch(s);
+    for (const d of s.districts) expect(d.frac).toBeCloseTo(0.5, 1);
+  });
+
+  it('екстрене відключення гасить район, але водоканал і метро живі', () => {
+    const s = createState('c3', 'normal', 1);
+    toggleEmergency(s, 'pecherskyi');
+    dispatch(s);
+    const d = s.districts.find((dd) => dd.id === 'pecherskyi')!;
+    expect(d.frac).toBeLessThan(0.01);
+    for (const o of s.objs.filter((oo) => oo.kind === 'crit')) expect(o.critServed).toBeGreaterThan(o.cap * 0.8);
+    const metro = s.objs.filter((o) => o.kind === 'metro' && o.district === 'pecherskyi');
+    expect(metro.reduce((a, o) => a + (o.critServed ?? 0), 0)).toBeGreaterThan(0);
+    // аварійне знеструмлення рахується як аварійне для довіри
+    hourly(s);
+    economyTick(s, 60);
+    expect(d.accEmerg).toBeGreaterThan(0);
+    toggleEmergency(s, 'pecherskyi');
+    dispatch(s);
+    expect(d.frac).toBeGreaterThan(0.98);
+  });
+
+  it('графік понад ліміт — Укренерго ріже аварійно', () => {
+    const s = createState('c1', 'normal', 1);
+    s.flags.indOff = 1;
+    s.flags.limitMW = 0.6 * plannedMW(s);
+    s.flags.limitUntil = s.t + 600;
+    setAllQueues(s, 1); // 83% > 60%
+    hourly(s); // план = 1 − 1/6
+    dispatch(s);
+    const dist = s.districts.reduce((a, d) => a + d.served, 0);
+    expect(dist).toBeLessThanOrEqual(limitMW(s) + 1);
+    economyTick(s, 60);
+    expect(s.districts.reduce((a, d) => a + d.accEmerg, 0)).toBeGreaterThan(0);
+  });
+
+  it('«Підібрати під ліміт» вкладає графік у наказ', () => {
+    const s = createState('c1', 'normal', 1);
+    s.flags.limitMW = 0.65 * plannedMW(s);
+    s.flags.limitUntil = s.t + 600;
+    const r = autoFitSchedule(s);
+    expect(r.ok).toBe(true);
+    expect(plannedMW(s)).toBeLessThanOrEqual(limitMW(s));
+    expect(s.schedule.mode).toBe('manual');
+  });
+
+  it('після завершення наказу ручний графік знімається', () => {
+    const s = createState('c1', 'normal', 1);
+    s.flags.limitMW = 600;
+    s.flags.limitUntil = s.t + 60;
+    setAllQueues(s, 3);
+    s.t += 61;
+    hourly(s);
+    expect(s.schedule.mode).toBe('auto');
+    expect(Object.values(s.schedule.queues).every((k) => k === 0)).toBe(true);
+    expect(s.flags.limitUntil).toBeUndefined();
+    dispatch(s);
+    for (const d of s.districts) expect(d.frac).toBeGreaterThan(0.98);
   });
 });

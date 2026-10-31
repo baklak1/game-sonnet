@@ -146,6 +146,28 @@ function genCost(s: GameState, o: PObj): number {
   }
 }
 
+export function industryDemand(s: GameState, o: PObj): number {
+  return o.cap * industryFactor(s.t) * (1 + 0.15 * Math.max(0, demandFactor(s) - 1));
+}
+
+/** Ліміт Укренерго для побуту й промзон, МВт (критичні споживачі й метро — поза лімітом). */
+export function limitMW(s: GameState): number {
+  return s.flags.limitMW ?? 1e9;
+}
+
+/** Скільки МВт споживатиме місто за поточним графіком (побут + промзони). */
+export function plannedMW(s: GameState): number {
+  const manual = s.schedule.mode === 'manual';
+  let mw = 0;
+  for (const d of s.districts) {
+    if (s.emergencyOff.includes(d.id)) continue;
+    const off = manual ? s.schedule.queues[d.id] ?? 0 : 0;
+    mw += districtDemand(s, d.share) * (1 - off / 6);
+  }
+  if (!s.flags.indOff) for (const o of s.objs) if (o.kind === 'industry' && o.built) mw += industryDemand(s, o);
+  return mw;
+}
+
 export function districtDemand(s: GameState, share: number): number {
   return B.kyivBaseMW * share * demandFactor(s);
 }
@@ -247,16 +269,17 @@ export function dispatch(s: GameState): DispatchResult {
   let sink = T;
   if (limited) {
     sink = net.addNode();
-    const tot = s.districts.reduce((a, d) => a + d.demand, 0);
-    net.addArc(sink, T, tot * (s.flags.limitFrac ?? 1), 0);
+    net.addArc(sink, T, limitMW(s), 0);
   }
+  const manual = s.schedule.mode === 'manual';
   for (const d of s.districts) {
     const dn = distNode.get(d.id)!;
     demandTotal += d.demand;
     const arcs: Arc[] = [];
+    const off = s.emergencyOff.includes(d.id) ? 6 : manual ? Math.max(0, Math.min(6, s.schedule.queues[d.id] ?? 0)) : 0;
     for (let k = 0; k < 6; k++) {
       const value = B.queueValue[k] + (d.priority ? B.priorityBonus : 0);
-      arcs.push(net.addArc(dn, sink, d.demand / 6, -value));
+      arcs.push(net.addArc(dn, sink, k >= 6 - off ? 0 : d.demand / 6, -value));
     }
     queueArcs.push(arcs);
   }
@@ -265,7 +288,7 @@ export function dispatch(s: GameState): DispatchResult {
     let dem = 0, value = 0;
     if (o.kind === 'crit') { dem = o.cap * (0.85 + 0.15 * demandFactor(s)); value = B.critValue; }
     else if (o.kind === 'metro') { dem = o.cap * metroFactor(s.t); value = 900; }
-    else if (o.kind === 'industry') { dem = o.cap * industryFactor(s.t) * (1 + 0.15 * Math.max(0, demandFactor(s) - 1)); value = s.flags.indPriority ? 105 : 60; }
+    else if (o.kind === 'industry') { dem = s.flags.indOff ? 0 : industryDemand(s, o); value = s.flags.indPriority ? 105 : 60; }
     else continue;
     const dn = distNode.get(o.district)!;
     demandTotal += dem;
