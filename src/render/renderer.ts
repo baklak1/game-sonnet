@@ -1,5 +1,6 @@
 // Малювання кадру: мапа, ніч з вогнями вікон, ЛЕП з потоком енергії, об’єкти, ППО, бригади,
 // загрози, ракети, вибухи, дим, пожежі, прожектори, підписи.
+import { font } from '../ui/fonts';
 import type { Camera } from '../core/camera';
 import { darkness } from '../sim/demand';
 import { DEFS, THREATS } from '../data/specs';
@@ -56,6 +57,25 @@ const SMOKE_POINTS: Record<string, [number, number][]> = {
   tpp: [[2.5, -6], [-2.5, -8], [0.5, -8]],
   tes: [[-6.5, -8], [0.5, -8], [7.5, -8]],
 };
+
+/** Колір рамки-підкладки за типом об’єкта, щоб енергооб’єкти не губилися серед забудови. */
+export function objColor(kind: string): string | null {
+  switch (kind) {
+    case 'tpp': case 'tes': case 'kgu': case 'gtu': case 'boiler': case 'wte': return '#ff8c42';
+    case 'hpp': case 'pspp': return '#4fc3ff';
+    case 'ses': case 'wes': case 'bess': return '#4ade80';
+    case 'sub750': case 'sub330': return '#ffd400';
+    case 'sub110': return '#d9c25a';
+    case 'import': return '#c58cff';
+    case 'crit': return '#f4f6fb';
+    case 'industry': return '#9aa3b5';
+    case 'pn': case 'base': case 'depot': return '#7fd3ff';
+    default: return null;
+  }
+}
+
+/** Великі об’єкти: підписи з ближчого масштабу й більші мітки на віддаленні. */
+const MAJOR = new Set(['tpp', 'tes', 'hpp', 'pspp', 'sub750']);
 
 export function spriteFor(o: PObj): string {
   if (o.kind === 'crit') return o.id === 'c_metro' ? 'crit_metro' : o.id === 'c_bort' ? 'crit_aer' : 'crit_water';
@@ -241,7 +261,6 @@ export class Renderer {
 
     this.drawLines(s, false);
     this.drawMetro(s, 0);
-    this.drawObjects(s, 1);
 
     if (dark > 0.01 && this.nightTerrain) {
       ctx.globalAlpha = Math.min(1, dark * 0.95);
@@ -252,11 +271,11 @@ export class Renderer {
       ctx.drawImage(this.lightsFull, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
-      // об’єкти трохи підсвічені, щоб не губилися вночі
-      this.drawObjects(s, 0.45 * dark);
       this.drawLines(s, true);
       this.drawMetro(s, dark);
     }
+    // енергооб’єкти мають власне освітлення — малюються поверх нічного затемнення
+    this.drawObjects(s, dark);
 
     this.drawFires(s, dark);
     this.drawSearchlights(s, dark);
@@ -389,18 +408,33 @@ export class Renderer {
     }
   }
 
-  private drawObjects(s: GameState, alpha: number): void {
+  private drawObjects(s: GameState, dark: number): void {
     const ctx = this.ctx;
-    const glowPass = alpha < 1;
+    const blink = Math.floor(this.time * 2.5) % 2 === 0;
     for (const o of s.objs) {
       if (o.kind === 'metro') continue;
       const spr = this.bank.plain[spriteFor(o)];
       if (!spr) continue;
       const x = Math.round(o.x - spr.width / 2), y = Math.round(o.y - spr.height / 2);
-      ctx.globalAlpha = (o.built ? 1 : 0.45) * alpha;
+      // підкладка: темний майданчик із кольоровою піксельною рамкою (кути зрізані)
+      const col = objColor(o.kind);
+      if (col) {
+        const f = o.hp / o.maxHp;
+        const pad = MAJOR.has(o.kind) ? 2 : 1;
+        const px = x - pad - 1, py = y - pad - 1, pw = spr.width + 2 * pad + 2, ph = spr.height + 2 * pad + 2;
+        ctx.globalAlpha = o.built ? 1 : 0.5;
+        ctx.fillStyle = dark > 0.3 ? 'rgba(10,14,28,0.82)' : 'rgba(14,18,32,0.72)';
+        ctx.fillRect(px + 1, py + 1, pw - 2, ph - 2);
+        ctx.fillStyle = o.built && f < 0.25 ? (blink ? '#ff3b4e' : '#5a1a22') : o.built && f < 0.5 ? '#ff8c42' : col;
+        ctx.fillRect(px + 1, py, pw - 2, 1);
+        ctx.fillRect(px + 1, py + ph - 1, pw - 2, 1);
+        ctx.fillRect(px, py + 1, 1, ph - 2);
+        ctx.fillRect(px + pw - 1, py + 1, 1, ph - 2);
+      }
+      ctx.globalAlpha = o.built ? 1 : 0.45;
       ctx.drawImage(spr, x, y);
-      if (glowPass) continue;
       ctx.globalAlpha = 1;
+      const top = col ? y - (MAJOR.has(o.kind) ? 2 : 1) - 1 : y;
       const hf = this.hitFlash.get(o.id);
       if (hf) {
         ctx.fillStyle = `rgba(255,80,60,${hf})`;
@@ -435,7 +469,7 @@ export class Renderer {
       const f = o.hp / o.maxHp;
       if (o.built && f < 0.995 && o.kind !== 'crit') {
         const bw = Math.max(6, Math.min(14, spr.width));
-        const bx = Math.round(o.x - bw / 2), by = y - 3;
+        const bx = Math.round(o.x - bw / 2), by = top - 3;
         ctx.fillStyle = '#11131a';
         ctx.fillRect(bx - 1, by - 1, bw + 2, 3);
         ctx.fillStyle = f >= 0.75 ? '#4ade80' : f >= 0.5 ? '#ffd166' : f >= 0.25 ? '#ff8c42' : '#e63946';
@@ -446,16 +480,15 @@ export class Renderer {
         if (job) {
           const p = Math.min(1, (s.t - job.start) / (job.until - job.start));
           ctx.fillStyle = '#11131a';
-          ctx.fillRect(x - 1, y - 4, spr.width + 2, 3);
+          ctx.fillRect(x - 1, top - 4, spr.width + 2, 3);
           ctx.fillStyle = '#ffd400';
-          ctx.fillRect(x, y - 3, Math.round(spr.width * p), 1);
+          ctx.fillRect(x, top - 3, Math.round(spr.width * p), 1);
         }
       }
       if (o.kind === 'crit' && (o.critServed ?? o.cap) < o.cap * 0.9) {
-        const blink = Math.floor(this.time * 3) % 2 === 0;
         if (blink) {
           ctx.fillStyle = (o.backupLeft ?? 0) > 0 ? '#ffd166' : '#e63946';
-          ctx.fillRect(Math.round(o.x) - 1, y - 4, 2, 2);
+          ctx.fillRect(Math.round(o.x) - 1, top - 4, 2, 2);
         }
       }
     }
@@ -769,25 +802,30 @@ export class Renderer {
     }
   }
 
-  private label(text: string, color: string, px: number): HTMLCanvasElement {
-    const key = `${text}|${color}|${px}`;
+  /** Підпис на мапі вибраним шрифтом: u — розмір «пікселя шрифту» в пікселях пристрою (кегль ≈ 8u). */
+  private label(text: string, color: string, u: number): HTMLCanvasElement {
+    const f = font.def;
+    const key = `${text}|${color}|${u}|${f.id}|${font.scale}`;
     let c = this.labelCache.get(key);
     if (c) return c;
+    const px = Math.max(8, Math.round(8 * u * f.canvasK * font.scale));
+    const o = Math.max(1, Math.round(px / 8)); // товщина піксельної обводки
+    const css = `${f.id === 'rubik' || f.id === 'system' ? '600 ' : ''}${px}px ${f.family}, sans-serif`;
     c = document.createElement('canvas');
     const ctx = c.getContext('2d')!;
-    ctx.font = `600 ${px}px "Rubik", sans-serif`;
-    const w = Math.ceil(ctx.measureText(text).width) + 8;
+    ctx.font = css;
+    const w = Math.ceil(ctx.measureText(text).width) + 4 * o;
     c.width = w;
-    c.height = Math.ceil(px * 1.5);
+    c.height = Math.ceil(px * 1.15) + 2 * o;
     const g = c.getContext('2d')!;
-    g.font = `600 ${px}px "Rubik", sans-serif`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.lineWidth = Math.max(2, px / 4);
-    g.strokeStyle = 'rgba(8,10,20,0.85)';
-    g.strokeText(text, w / 2, c.height / 2);
+    g.font = css;
+    g.textBaseline = 'alphabetic';
+    const bx = 2 * o, by = Math.round(px * 0.88) + o;
+    // обводка: текст темним, зсунутий на «піксель» у 8 напрямках
+    g.fillStyle = '#080a14';
+    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) g.fillText(text, bx + dx * o, by + dy * o);
     g.fillStyle = color;
-    g.fillText(text, w / 2, c.height / 2);
+    g.fillText(text, bx, by);
     if (this.labelCache.size > 400) this.labelCache.clear();
     this.labelCache.set(key, c);
     return c;
@@ -797,27 +835,59 @@ export class Renderer {
     const ctx = this.ctx;
     const dpr = cam.dpr;
     const z = cam.effZoom;
-    const fs = Math.round(11 * dpr);
+    // «піксель шрифту» в пікселях пристрою: кегль 8u, тож гліфи лягають на сітку без розмиття
+    const u = Math.max(2, Math.round(1.5 * dpr));
+    const lh = Math.round(9.5 * u * font.def.canvasK * font.scale);
     const put = (c: HTMLCanvasElement, x: number, y: number) => ctx.drawImage(c, Math.round(x - c.width / 2), Math.round(y - c.height / 2));
-    if (z < 3.2 || this.overlay === 'grid') {
-      for (const d of s.districts) {
-        const [x, y] = cam.toScreen(d.cx, d.cy);
-        if (x < -80 || y < -40 || x > cam.cssW + 80 || y > cam.cssH + 40) continue;
-        const pct = Math.round(d.frac * 100);
-        const col = pct >= 97 ? '#a7f3c0' : pct >= 70 ? '#ffe08a' : pct >= 35 ? '#ffb070' : '#ff7a85';
-        put(this.label(d.name, '#e8ecf4', fs), x * dpr, y * dpr - fs * 0.6);
-        const em = s.emergencyOff.includes(d.id);
-        const t2 = em ? 'ЕКСТРЕНО ВИМКНЕНО' : `💡${pct}%${d.queuesOff > 0 ? ` · ${d.queuesOff}/6 черг` : ''}${d.noHeat > 0.3 ? ' · ❄' : ''}`;
-        put(this.label(t2, em ? '#ff5a68' : col, fs), x * dpr, y * dpr + fs * 0.6);
+    const onScreen = (x: number, y: number, m: number) => x > -m && y > -m && x < cam.cssW + m && y < cam.cssH + m;
+
+    // на віддаленні — мітки енергооб’єктів постійного розміру
+    if (z < 1.5) {
+      for (const o of s.objs) {
+        const col = objColor(o.kind);
+        if (!col || !o.built) continue;
+        const [x, y] = cam.toScreen(o.x, o.y);
+        if (!onScreen(x, y, 10)) continue;
+        const sz = Math.round((MAJOR.has(o.kind) ? 8 : o.kind === 'sub110' || o.kind === 'industry' ? 4 : 6) * dpr);
+        const bw = Math.max(1, Math.round(dpr * 1.5));
+        const f = o.hp / o.maxHp;
+        const X = Math.round(x * dpr - sz / 2), Y = Math.round(y * dpr - sz / 2);
+        ctx.fillStyle = '#080a14';
+        ctx.fillRect(X - bw, Y - bw, sz + 2 * bw, sz + 2 * bw);
+        ctx.fillStyle = f < 0.25 ? (Math.floor(this.time * 2.5) % 2 ? '#ff3b4e' : '#5a1a22') : f < 0.5 ? '#ff8c42' : col;
+        ctx.fillRect(X, Y, sz, sz);
+        if (MAJOR.has(o.kind)) {
+          ctx.fillStyle = '#080a14';
+          const c = Math.round(sz / 3);
+          ctx.fillRect(X + c, Y + c, sz - 2 * c, sz - 2 * c);
+        }
       }
     }
-    if (z >= 3) {
-      const fs2 = Math.round(9 * dpr);
+
+    // на найбільшому віддаленні підписи районів злипаються в кашу — лишаємо тільки мітки об’єктів
+    if ((z < 3.2 && z >= 1.2) || this.overlay === 'grid') {
+      for (const d of s.districts) {
+        const [x, y] = cam.toScreen(d.cx, d.cy);
+        if (!onScreen(x, y, 80)) continue;
+        const pct = Math.round(d.frac * 100);
+        const col = pct >= 97 ? '#a7f3c0' : pct >= 70 ? '#ffe08a' : pct >= 35 ? '#ffb070' : '#ff7a85';
+        put(this.label(d.name, '#e8ecf4', u), x * dpr, y * dpr - lh * 0.5);
+        const em = s.emergencyOff.includes(d.id);
+        const t2 = em ? 'ЕКСТРЕНО ВИМКНЕНО' : `${pct}%${d.queuesOff > 0 ? ` · ${d.queuesOff}/6 черг` : ''}${d.noHeat > 0.3 ? ' · холод' : ''}`;
+        put(this.label(t2, em ? '#ff5a68' : col, u), x * dpr, y * dpr + lh * 0.5);
+      }
+    }
+
+    // назви: великі станції — з масштабу 2, підстанції 330 й імпорт — коли сховано підписи районів
+    if (z >= 2) {
+      const districtsShown = z < 3.2 || this.overlay === 'grid';
       for (const o of s.objs) {
-        if (o.kind !== 'tpp' && o.kind !== 'tes' && o.kind !== 'hpp' && o.kind !== 'pspp' && o.kind !== 'sub750' && o.kind !== 'sub330') continue;
-        const [x, y] = cam.toScreen(o.x, o.y + 9);
-        if (x < -50 || y < -20 || x > cam.cssW + 50 || y > cam.cssH + 20) continue;
-        put(this.label(o.name, '#d6dbe6', fs2), x * dpr, y * dpr);
+        const major = MAJOR.has(o.kind);
+        if (!major && (districtsShown || (o.kind !== 'sub330' && o.kind !== 'import' && o.kind !== 'wte'))) continue;
+        const spr = this.bank.plain[spriteFor(o)];
+        const [x, y] = cam.toScreen(o.x, o.y + (spr ? spr.height / 2 + 3 : 8));
+        if (!onScreen(x, y, 60)) continue;
+        put(this.label(o.name, objColor(o.kind) ?? '#d6dbe6', u), x * dpr, y * dpr + lh * 0.5);
       }
     }
     void dark;

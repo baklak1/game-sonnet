@@ -10,7 +10,7 @@ import { ammoPackCost, buildCost, buildDays, F16_COST, f16Available, fmtMoney, m
 import { needsProject } from '../sim/crews';
 import { crewPeople } from '../sim/init';
 import { avgServed, goalStatus } from '../sim/objectives';
-import { dayOf, fmtTime, temperature } from '../sim/demand';
+import { DTYPE, dayOf, districtDef, fmtTime, isWeekend, minuteOfDay, temperature } from '../sim/demand';
 import { esc } from './screens';
 import { iconImg } from '../render/icons';
 import { spriteFor } from '../render/renderer';
@@ -33,8 +33,10 @@ function hpBar(f: number): string {
   return `<div class="hpbar"><i style="width:${Math.round(f * 100)}%;background:${col}"></i></div>`;
 }
 
+/** Рядок «назва — значення». Короткі значення («643 МВт») не розриваються на два рядки, довгі переносяться. */
 function row(k: string, v: string): string {
-  return `<div class="row"><span class="k">${k}</span><b>${v}</b></div>`;
+  const plain = v.replace(/<[^>]*>/g, '');
+  return `<div class="row"><span class="k">${k}</span><b class="${plain.length <= 24 ? 'nw' : 'wrap'}">${v}</b></div>`;
 }
 
 const mw = (v: number) => `${Math.round(v)} МВт`;
@@ -82,7 +84,7 @@ export function defensePanel(s: GameState, adOverlay: boolean): string {
     <div class="btns"><button class="${adOverlay ? 'on' : ''}" data-act="toggleAD">Зони ППО на карті</button></div>
     <div class="list" style="margin-top:6px">${items}</div>
     <h3>Склад боєприпасів</h3>${ammo || '<p>Немає систем, що потребують ракет.</p>'}
-    <p style="font-size:11px">Магазини поповнюються зі складу, коли комплекс не стріляє.</p>`;
+    <p style="font-size:calc(12px * var(--fs))">Магазини поповнюються зі складу, коли комплекс не стріляє.</p>`;
 }
 
 export function crewsPanel(s: GameState): string {
@@ -140,7 +142,7 @@ export function gridPanel(s: GameState, gridOverlay: boolean): string {
     ${row('Промзони отримують', `${mw(s.industryServed)}`)}
     <div class="btns"><button class="${s.flags.indPriority ? 'on' : ''}" data-act="toggleInd">${s.flags.indPriority ? 'Пріоритет: промисловість (більше грошей)' : 'Пріоритет: побут (промзони гасимо першими)'}</button></div>
     <h3>Райони (торкніться, щоб дати пріоритет)</h3>
-    <p style="font-size:11px">Дефіцит ділиться чергами. Пріоритетні райони (до двох) вимикаються останніми.</p>
+    <p style="font-size:calc(12px * var(--fs))">Дефіцит ділиться чергами. Пріоритетні райони (до двох) вимикаються останніми.</p>
     <div class="list">${d}</div>`;
 }
 
@@ -296,8 +298,17 @@ export function districtPanel(s: GameState, id: string): string {
   const subs = s.objs.filter((o) => o.district === id && o.kind === 'sub110');
   const local = s.objs.filter((o) => o.district === id && ['kgu', 'gtu', 'ses', 'bess', 'boiler'].includes(o.kind));
   const heat = temperature(s) < B.heatTemp;
+  const def = districtDef(d.id);
+  const ty = def ? DTYPE[def.type] : null;
+  // добовий профіль попиту: 24 стовпчики, поточна година підсвічена
+  const day0 = s.t - minuteOfDay(s.t);
+  const prof = Array.from({ length: 24 }, (_, h) => districtDemand(s, d, day0 + h * 60 + 30));
+  const pmax = Math.max(...prof), peakH = prof.indexOf(pmax), nowH = Math.floor(minuteOfDay(s.t) / 60);
+  const spark = `<div class="spark">${prof.map((v, h) => `<i class="${h === nowH ? 'now' : ''}" style="height:${Math.round((v / pmax) * 100)}%"></i>`).join('')}</div><div class="spark-ax"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>`;
   return `<h2>${d.name} район</h2>
-    ${row('Населення', `~${d.pop} тис.`)}${row('Попит', mw(d.demand))}${row('Отримує', `${mw(d.served)} (${Math.round(d.frac * 100)}%)`)}
+    ${ty && def ? `<p><span class="tag ${def.type === 'center' ? 'warn' : def.type === 'sleep' ? '' : 'good'}">${ty.name}</span>${def.priv >= 0.2 ? '<span class="tag">приватний сектор</span>' : ''} ${ty.note}${def.priv >= 0.2 ? ' Багато будинків з електроопаленням — у мороз попит росте сильніше.' : ''}</p>` : ''}
+    ${spark}
+    ${row('Населення', `~${d.pop} тис.`)}${row('Попит зараз', mw(d.demand))}${row('Пік доби', `${mw(pmax)} о ${peakH}:00`)}${row('Сьогодні', isWeekend(s.t) ? 'вихідний' : 'робочий день')}${row('Отримує', `${mw(d.served)} (${Math.round(d.frac * 100)}%)`)}
     ${row('Черги вимкнено', `${d.queuesOff} з 6`)}${heat ? row('Тепло', d.noHeat > 0.05 ? `${Math.round((1 - d.noHeat) * 100)}% (ТЕЦ: ${s.objs.find((o) => o.id === d.heatSrc)?.name})` : 'є') : ''}
     ${row('Пункти незламності', `${d.pn} / 3`)}
     <h3>Живлення</h3>${subs.map((o) => row(o.name, `${Math.round(hpAvail(o.hp, o.maxHp) * 100)}%`)).join('')}
@@ -324,7 +335,7 @@ export function metroPanel(s: GameState, lineId: string): string {
     <p>${line.stations.length} станцій · тягове живлення ~${line.mw} МВт</p>
     <p>${open ? 'Метро працює.' : 'Нічна перерва: поїзди в депо, станції — укриття.'} Якщо район, через який іде лінія, без світла, поїзди на цій ділянці зупиняються, а кияни дуже злі.</p>
     <h3>Ділянки по районах</h3>${rows}
-    <p style="font-size:11px">Метро має пріоритет одразу після водоканалу. Дайте району з метро резервне живлення (КГУ, батарея) — і поїзди підуть навіть без кільця.</p>`;
+    <p style="font-size:calc(12px * var(--fs))">Метро має пріоритет одразу після водоканалу. Дайте району з метро резервне живлення (КГУ, батарея) — і поїзди підуть навіть без кільця.</p>`;
 }
 
 export function schedulePanel(s: GameState): string {
@@ -338,20 +349,22 @@ export function schedulePanel(s: GameState): string {
     const em = s.emergencyOff.includes(d.id);
     const k = s.schedule.queues[d.id] ?? 0;
     return `<div class="item" style="flex-wrap:wrap"><span class="t"><b>${d.name}${d.priority ? ' ★' : ''}</b>
-      <small>${Math.round(districtDemand(s, d.share))} МВт · світло ${Math.round(d.frac * 100)}%${em ? ' · <span style="color:var(--bad)">ЕКСТРЕНО ВИМКНЕНО</span>' : ''}</small></span>
+      <small>${DTYPE[districtDef(d.id)?.type ?? 'mixed'].name.toLowerCase()} · ${Math.round(districtDemand(s, d))} МВт · світло ${Math.round(d.frac * 100)}%${em ? ' · <span style="color:var(--bad)">ЕКСТРЕНО ВИМКНЕНО</span>' : ''}</small></span>
       <span style="display:flex;gap:4px;align-items:center">${manual ? `<button class="small" data-act="schedD" data-arg="${d.id}:-1">−</button><b style="min-width:30px;text-align:center">${k}/6</b><button class="small" data-act="schedD" data-arg="${d.id}:1">+</button>` : `<span class="tag">авто</span>`}
       <button class="small ${em ? 'on' : ''}" data-act="emerg" data-arg="${d.id}" title="Екстрене відключення">⚡</button></span></div>`;
   }).join('');
   return `<h2>Графіки відключень</h2>
     ${limited ? `<p><span class="tag ${over ? 'bad' : 'good'}">Наказ Укренерго: ≤ ${Math.round(lim)} МВт ще ${Math.ceil(((s.flags.limitUntil ?? 0) - s.t) / 60)} год</span></p>` : '<p><span class="tag good">Наказу Укренерго зараз немає</span></p>'}
     ${row('Заплановано (побут + промзони)', `<span style="color:${over ? 'var(--bad)' : 'var(--good)'}">${Math.round(plan)} МВт</span>`)}
+    ${limited && !over ? `<p style="color:var(--good)">Запас ${Math.max(0, Math.round(lim - plan))} МВт — можна ввімкнути когось назад.</p>` : ''}
     ${over ? `<p style="color:var(--bad)">Перевищення ${Math.round(plan - lim)} МВт: Укренерго саме застосує аварійні відключення (злять утричі більше) і випише штраф.</p>` : ''}
     <div class="tabs"><button class="${manual ? '' : 'on'}" data-act="schedMode" data-arg="auto">Автомат</button><button class="${manual ? 'on' : ''}" data-act="schedMode" data-arg="manual">Ручний графік</button></div>
-    <p style="font-size:12px">${manual ? 'Ви самі вирішуєте, скільки черг (з 6) вимкнено в кожному районі. Планові відключення киян злять менше.' : 'Автомат ділить дефіцит рівномірно, але під наказом Укренерго працює не точно (+10% до злості).'}</p>
+    <p style="font-size:calc(12px * var(--fs))">${manual ? 'Ви самі вирішуєте, скільки черг (з 6) вимкнено в кожному районі. Планові відключення киян злять менше.' : 'Автомат ділить дефіцит рівномірно, але під наказом Укренерго працює не точно (+10% до злості).'}</p>
     <div class="row"><span class="k">Для всього Києва</span><span><button class="small" data-act="schedAll" data-arg="${allK - 1}">−</button> <b>${allK}/6</b> <button class="small" data-act="schedAll" data-arg="${allK + 1}">+</button></span></div>
-    <div class="btns"><button class="primary" data-act="schedFit">Підібрати під ліміт</button><button class="${s.flags.indOff ? 'on' : ''}" data-act="indOff">${s.flags.indOff ? 'Промзони вимкнено' : 'Вимкнути промзони'}</button></div>
+    <div class="btns"><button class="${s.flags.indOff ? 'on' : ''}" data-act="indOff">${s.flags.indOff ? 'Промзони вимкнено' : 'Вимкнути промзони'}</button></div>
+    <p style="font-size:calc(12px * var(--fs))">Спальні райони найбільше їдять увечері, діловий центр — удень. У центрі менше мешканців (менше злості), але світло там приносить більше грошей. Попит району змінюється щогодини — графік треба переглядати.</p>
     <h3>Райони</h3>
-    <p style="font-size:12px">⚡ — екстрене відключення: миттєво звільняє потужність для інших районів, метро й водоканалу, у тривогу менше шкоди від пожеж на підстанціях. Але це аварійне відключення — кияни злі.</p>
+    <p style="font-size:calc(12px * var(--fs))">⚡ — екстрене відключення: миттєво звільняє потужність для інших районів, метро й водоканалу, у тривогу менше шкоди від пожеж на підстанціях. Але це аварійне відключення — кияни злі.</p>
     <div class="list">${rows}</div>`;
 }
 

@@ -2,7 +2,7 @@
 // Навантаження району розбите на 6 черг зі спадною цінністю — дефіцит ділиться чесно,
 // як графіки відключень. Критичні споживачі мають найвищу цінність.
 import { B, hpAvail } from '../data/balance';
-import { demandFactor, isHeatingSeason, isNightCharge, isPeakHour, solarFactor } from './demand';
+import { demandFactor, districtFactor, isHeatingSeason, isNightCharge, isPeakHour, solarFactor } from './demand';
 import type { GameState, PObj } from './types';
 
 interface Arc { to: number; cap: number; cost: number; flow: number; rev: number }
@@ -162,14 +162,15 @@ export function plannedMW(s: GameState): number {
   for (const d of s.districts) {
     if (s.emergencyOff.includes(d.id)) continue;
     const off = manual ? s.schedule.queues[d.id] ?? 0 : 0;
-    mw += districtDemand(s, d.share) * (1 - off / 6);
+    mw += districtDemand(s, d) * (1 - off / 6);
   }
   if (!s.flags.indOff) for (const o of s.objs) if (o.kind === 'industry' && o.built) mw += industryDemand(s, o);
   return mw;
 }
 
-export function districtDemand(s: GameState, share: number): number {
-  return B.kyivBaseMW * share * demandFactor(s);
+/** Попит району: частка міста × добовий профіль за типом району (спальний, центр, змішаний). */
+export function districtDemand(s: GameState, d: { id: string; share: number }, t = s.t): number {
+  return B.kyivBaseMW * d.share * districtFactor(s, d.id, t);
 }
 
 export interface DispatchResult {
@@ -264,7 +265,7 @@ export function dispatch(s: GameState): DispatchResult {
   // споживачі; ліміт Укренерго обмежує сумарне побутове споживання (критичні — поза лімітом)
   const queueArcs: Arc[][] = [];
   let demandTotal = 0;
-  for (const d of s.districts) d.demand = districtDemand(s, d.share);
+  for (const d of s.districts) d.demand = districtDemand(s, d);
   const limited = (s.flags.limitUntil ?? 0) > s.t;
   let sink = T;
   if (limited) {

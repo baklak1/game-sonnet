@@ -14,11 +14,13 @@
 
 ## Музика
 
-| Файл | Джерело | Автор | Ліцензія |
-|---|---|---|---|
-| music/day.ogg | «sector» з [Dark Sci-Fi Audio Pack](https://opengameart.org/node/188336) | Ball Logic | CC0 |
-| music/alert.ogg | [War Theme](https://opengameart.org/content/war-theme) (перші 2 хв) | Spring Spring | CC0 |
+`music/main.ogg` — трек, наданий власником проєкту для гри (джерело й ліцензію підтверджує він). Оброблено `tools/sounds.py`: нормалізація гучності, плавне наростання 8 с на початку й згасання 6 с у кінці для безшовної петлі.
 
 ## Шрифти
 
-Rubik і Pixelify Sans — SIL Open Font License 1.1 (`src/assets/fonts/OFL-*.txt`).
+Усі — SIL Open Font License 1.1, тексти ліцензій у `src/assets/fonts/OFL-*.txt`:
+- Tiny5 © The Tiny5 Project Authors (Gissio) — підмножина гліфів (латиниця, кирилиця, ₴);
+- Press Start 2P © The Press Start 2P Project Authors (CodeMan38) — оригінальний файл без змін (зарезервована назва шрифту);
+- Handjet © The Handjet Project Authors (Rosetta Type) — підмножина;
+- JetBrains Mono © The JetBrains Mono Project Authors — підмножина;
+- Pixelify Sans © The Pixelify Sans Project Authors; Rubik © The Rubik Project Authors — сабсети Google Fonts.

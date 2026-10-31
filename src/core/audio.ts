@@ -21,8 +21,7 @@ import boom2Url from '../assets/sfx/boom2.ogg';
 import boomFarUrl from '../assets/sfx/boom_far.ogg';
 import kill2Url from '../assets/sfx/kill2.ogg';
 import repairUrl from '../assets/sfx/repair.ogg';
-import musicDayUrl from '../assets/music/day.ogg';
-import musicAlertUrl from '../assets/music/alert.ogg';
+import musicMainUrl from '../assets/music/main.ogg';
 
 const URLS: Record<string, string> = {
   siren: sirenUrl, allclear: allclearUrl, boom: boomUrl, bigboom: bigboomUrl, kill: killUrl, pop: popUrl,
@@ -57,6 +56,8 @@ export class Sfx {
   master: GainNode | null = null;
   enabled = true;
   ambient = false;
+  /** Гучність ефектів 0–1 (повзунок «Звуки»). */
+  sfxVolume = 0.8;
   private buffers: Record<string, AudioBuffer> = {};
   private noise: AudioBuffer | null = null;
   private last: Record<string, number> = {};
@@ -77,14 +78,14 @@ export class Sfx {
       if (!AC) return;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.6;
+      this.master.gain.value = 0.75 * this.sfxVolume;
       this.master.connect(this.ctx.destination);
       const len = this.ctx.sampleRate * 1.5;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = this.music ? this.musicVolume * 0.5 : 0;
+      this.musicGain.gain.value = this.music ? this.musicVolume * 0.8 : 0;
       this.musicGain.connect(this.ctx.destination);
       void this.loadAll().then(() => this.loadMusic());
     }
@@ -106,7 +107,7 @@ export class Sfx {
 
   private async loadMusic(): Promise<void> {
     const ctx = this.ctx!;
-    for (const [name, url] of [['day', musicDayUrl], ['alert', musicAlertUrl]] as const) {
+    for (const [name, url] of [['main', musicMainUrl]] as const) {
       try {
         const data = await toArrayBuffer(url);
         this.musicBufs[name] = await new Promise<AudioBuffer>((res, rej) => ctx.decodeAudioData(data, res, rej));
@@ -117,24 +118,30 @@ export class Sfx {
     this.applyMusic();
   }
 
-  /** Фонова музика: спокійна вдень, тривожна під час атаки; перехід 3 с. */
+  /** Фонова музика: один трек по колу; під час тривоги не перемикається й не починається заново. */
   setMusic(name: 'day' | 'alert' | 'off'): void {
     if (this.wantMusic === name) return;
     this.wantMusic = name;
     this.applyMusic();
   }
 
+  setSfxVolume(v: number): void {
+    this.sfxVolume = Math.max(0, Math.min(1, v));
+    this.enabled = this.sfxVolume > 0;
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(0.75 * this.sfxVolume, this.ctx.currentTime, 0.05);
+  }
+
   setMusicEnabled(on: boolean, volume = this.musicVolume): void {
     this.music = on;
     this.musicVolume = volume;
-    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(on ? volume * 0.5 : 0, this.ctx.currentTime, 0.3);
+    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(on ? volume * 0.8 : 0, this.ctx.currentTime, 0.3);
     this.applyMusic();
   }
 
   private applyMusic(): void {
     const ctx = this.ctx;
     if (!ctx || !this.musicGain) return;
-    const name = this.music ? this.wantMusic : 'off';
+    const name = this.music && this.wantMusic !== 'off' ? 'main' : 'off';
     if (this.musicSrc?.name === name) return;
     const t = ctx.currentTime;
     if (this.musicSrc) {
@@ -149,8 +156,9 @@ export class Sfx {
     src.buffer = buf;
     src.loop = true;
     const g = ctx.createGain();
+    // плавний вхід: гучність наростає кілька секунд (у самому файлі теж є наростання на початку кожного кола)
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.setTargetAtTime(1, t, 1);
+    g.gain.linearRampToValueAtTime(1, t + 6);
     src.connect(g);
     g.connect(this.musicGain);
     src.start(t + 0.05);

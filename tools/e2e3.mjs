@@ -30,12 +30,20 @@ for (const [w, h] of [[740, 360], [915, 412], [1280, 720]]) {
   await page.waitForTimeout(900);
   await page.evaluate(() => window.__app.handle('tutorSkip', ''));
   await page.waitForTimeout(300);
-  const font = await page.evaluate(() => ({ body: getComputedStyle(document.body).fontFamily, rubik: document.fonts.check('600 12px "Rubik"') }));
+  const font = await page.evaluate(() => ({ body: getComputedStyle(document.body).fontFamily, rubik: document.fonts.check('16px "Tiny5"') }));
   const overflow = await page.evaluate(() => { const t = document.querySelector('.topbar') ?? document.querySelector('#hud'); return t ? t.scrollWidth - t.clientWidth : -1; });
   log(w, font, 'topbar overflow', overflow);
-  if (!font.rubik) errors.push(`${w}: Rubik не завантажено`);
+  if (!font.rubik) errors.push(`${w}: Tiny5 не завантажено`);
   if (overflow > 2) errors.push(`${w}: верхня панель вилазить на ${overflow}px`);
   await page.screenshot({ path: `${out}v12-game-${w}.png` });
+  if (w === 915) {
+    await page.evaluate(() => { const c = window.__app.cam; c.setZoom(0.1); });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${out}v12-zoomout.png` });
+    await page.evaluate(() => { const c = window.__app.cam; c.setZoom(4); c.focus(300, 230); });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${out}v12-zoomin.png` });
+  }
   await page.context().close();
 }
 
@@ -57,7 +65,7 @@ await page.waitForTimeout(400);
 const q = await page.evaluate(() => ({ ...window.__app.s.schedule }));
 log('schedule after +2', q.mode, JSON.stringify(q.queues));
 if (q.mode !== 'manual' || Object.values(q.queues).some((k) => k !== 2)) errors.push('«Для всього Києва» не виставило 2 черги');
-await page.click('[data-act="schedFit"]');
+await page.click('[data-act="schedAll"]:last-of-type'); // гравець сам додає ще чергу, поки не вкладеться
 await page.waitForTimeout(400);
 const fit = await page.evaluate(async () => {
   const { plannedMW, limitMW } = await import('/src/sim/grid.ts');
@@ -65,7 +73,7 @@ const fit = await page.evaluate(async () => {
   return { planned: Math.round(plannedMW(s)), limit: limitMW(s), queues: JSON.stringify(s.schedule.queues) };
 });
 log('fit', fit);
-if (fit.planned > fit.limit) errors.push('«Підібрати під ліміт» не вклалося');
+if (fit.planned > fit.limit) errors.push('3 черги не вклалися в ліміт');
 await page.screenshot({ path: out + 'v12-sched-manual.png' });
 // екстрено вимкнути Оболонь
 await page.click('[data-act="emerg"][data-arg="obolonskyi"]');
@@ -89,12 +97,42 @@ if (sch.mode !== 'auto') errors.push('ручний графік не знявс�
 // музика: після тапу декодується й грає тривожний трек під час атаки
 const music = await page.evaluate(async () => {
   const { sfx } = await import('/src/core/audio.ts');
-  for (let i = 0; i < 40 && !(sfx.musicBufs && sfx.musicBufs.alert); i++) await new Promise((r) => setTimeout(r, 250));
+  for (let i = 0; i < 40 && !(sfx.musicBufs && sfx.musicBufs.main); i++) await new Promise((r) => setTimeout(r, 250));
   return { bufs: Object.keys(sfx.musicBufs ?? {}), playing: sfx.musicSrc?.name ?? null, phase: window.__app.s.phase };
 });
 log('music', music);
-if (music.bufs.length < 2) errors.push('музика не декодувалась');
-if (music.phase === 'alert' && music.playing !== 'alert') errors.push('під час тривоги не грає тривожний трек');
+if (!music.bufs.includes('main')) errors.push('музика не декодувалась');
+if (music.playing !== 'main') errors.push('музика не грає');
+
+// панель району з добовим профілем
+await page.evaluate(() => { const a = window.__app; a.select({ kind: 'district', id: 'desnianskyi' }); });
+await page.waitForTimeout(500);
+await page.screenshot({ path: out + 'v13-district.png' });
+
+// налаштування: повзунки й шрифт
+await page.evaluate(() => window.__app.showPauseMenu());
+await page.waitForTimeout(300);
+const setRange = (key, v) => page.evaluate(([key, v]) => {
+  const el = document.querySelector(`input[data-set="${key}"]`);
+  el.value = String(v);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}, [key, v]);
+await setRange('musicPct', 30);
+await setRange('sfxPct', 0);
+await setRange('fontScale', 120);
+await page.click('[data-act="setFont"][data-arg="handjet"]');
+await page.waitForTimeout(600);
+const st = await page.evaluate(async () => {
+  const { sfx } = await import('/src/core/audio.ts');
+  const p = JSON.parse(localStorage.getItem('svitlo:progress:v1'));
+  return { saved: p.settings, musicVol: sfx.musicVolume, sfxOn: sfx.enabled, fs: getComputedStyle(document.documentElement).getPropertyValue('--fs'), font: getComputedStyle(document.body).fontFamily };
+});
+log('settings', st);
+if (st.saved.musicPct !== 30 || st.saved.sfxPct !== 0 || st.saved.fontScale !== 120 || st.saved.font !== 'handjet') errors.push('налаштування не збереглися');
+if (Math.abs(st.musicVol - 0.3) > 0.01 || st.sfxOn) errors.push('гучність не застосувалась');
+if (!st.font.includes('Handjet') || Math.abs(Number(st.fs) - 1.25 * 1.2) > 0.01) errors.push('шрифт або розмір не застосувались');
+await page.screenshot({ path: out + 'v13-pause-handjet.png' });
 
 await browser.close();
 log('errors:', errors.length ? errors : 'none');

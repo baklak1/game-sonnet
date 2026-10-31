@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FlowNet, dispatch, districtDemand, limitMW, plannedMW } from '../src/sim/grid';
 import { createState, objById } from '../src/sim/init';
-import { autoFitSchedule, setAllQueues, setDistrictQueues, toggleEmergency } from '../src/sim/actions';
+import { setAllQueues, setDistrictQueues, toggleEmergency } from '../src/sim/actions';
 import { economyTick, hourly } from '../src/sim/economy';
+import { demandFactor, districtFactor, districtRevenueK } from '../src/sim/demand';
 
 describe('FlowNet (min-cost flow з відʼємними вартостями)', () => {
   it('віддає перевагу дешевшому джерелу', () => {
@@ -68,7 +69,7 @@ describe('енергосистема Києва', () => {
   it('ліміт Укренерго обмежує побутове споживання, але не критичне', () => {
     const s = createState('c1', 'normal', 1);
     s.flags.indOff = 1;
-    s.flags.limitMW = 0.7 * s.districts.reduce((a, d) => a + districtDemand(s, d.share), 0);
+    s.flags.limitMW = 0.7 * s.districts.reduce((a, d) => a + districtDemand(s, d), 0);
     s.flags.limitUntil = s.t + 600;
     dispatch(s);
     const dist = s.districts.reduce((a, d) => a + d.served, 0);
@@ -135,16 +136,6 @@ describe('графіки відключень і екстрені відключ
     expect(s.districts.reduce((a, d) => a + d.accEmerg, 0)).toBeGreaterThan(0);
   });
 
-  it('«Підібрати під ліміт» вкладає графік у наказ', () => {
-    const s = createState('c1', 'normal', 1);
-    s.flags.limitMW = 0.65 * plannedMW(s);
-    s.flags.limitUntil = s.t + 600;
-    const r = autoFitSchedule(s);
-    expect(r.ok).toBe(true);
-    expect(plannedMW(s)).toBeLessThanOrEqual(limitMW(s));
-    expect(s.schedule.mode).toBe('manual');
-  });
-
   it('після завершення наказу ручний графік знімається', () => {
     const s = createState('c1', 'normal', 1);
     s.flags.limitMW = 600;
@@ -159,3 +150,40 @@ describe('графіки відключень і екстрені відключ
     for (const d of s.districts) expect(d.frac).toBeGreaterThan(0.98);
   });
 });
+
+describe('різний попит районів', () => {
+  const at = (s: ReturnType<typeof createState>, h: number) => { s.t = Math.floor(s.t / 1440) * 1440 + h * 60; return s; };
+
+  it('загальний попит Києва майже не змінився — перерозподіл між районами', () => {
+    const s = createState('c1', 'normal', 1);
+    for (const h of [3, 9, 13, 20]) {
+      at(s, h);
+      const tot = s.districts.reduce((a, d) => a + districtDemand(s, d), 0);
+      const old = s.districts.reduce((a, d) => a + 950 * d.share * demandFactor(s), 0);
+      expect(Math.abs(tot / old - 1)).toBeLessThan(0.03);
+    }
+  });
+
+  it('спальний район пікує ввечері, діловий центр — удень', () => {
+    const s = createState('c1', 'normal', 1);
+    const f = (id: string, h: number) => districtFactor(at(s, h), id);
+    expect(f('desnianskyi', 20)).toBeGreaterThan(f('desnianskyi', 12) * 1.25);
+    expect(f('pecherskyi', 12)).toBeGreaterThan(f('pecherskyi', 20) * 1.25);
+    expect(f('pecherskyi', 12)).toBeGreaterThan(f('desnianskyi', 12));
+  });
+
+  it('приватний сектор сильніше реагує на мороз', () => {
+    const s = createState('c1', 'normal', 1);
+    at(s, 12);
+    const warm = { h: districtFactor(s, 'holosiivskyi'), o: districtFactor(s, 'obolonskyi') };
+    s.tempMods.push({ d: -25, until: s.t + 600 });
+    const coldH = districtFactor(s, 'holosiivskyi') / warm.h, coldO = districtFactor(s, 'obolonskyi') / warm.o;
+    expect(coldH).toBeGreaterThan(coldO);
+  });
+
+  it('світло в діловому центрі приносить більше грошей за МВт·год', () => {
+    expect(districtRevenueK('pecherskyi')).toBeGreaterThan(1.1);
+    expect(districtRevenueK('desnianskyi')).toBeLessThan(1);
+  });
+});
+

@@ -53,14 +53,15 @@ ff(['-i', p('sci-fi-sfx/explosion_02.ogg'), '-af', 'bass=g=4,loudnorm=I=-15,afad
 ff(['-i', p('25-CC0-bang-sfx/cannon_03.ogg'), '-af', 'lowpass=f=1800,loudnorm=I=-17,afade=t=out:st=0.8:d=0.4'], 'boom_far')
 ff(['-i', p('25-CC0-bang-sfx/fw_04.ogg'), '-t', '0.9', '-af', 'loudnorm=I=-18,afade=t=out:st=0.6:d=0.3'], 'kill2')
 ff(['-i', p('100-CC0-SFX_0/metal_03.ogg'), '-af', 'loudnorm=I=-20'], 'repair')
-# ---- фонова музика (CC0, OpenGameArt): день — «sector» (Dark Sci-Fi Audio Pack), тривога — «War Theme»
-MUS = os.path.join(os.path.dirname(SRC.rstrip('/')), 'music')
-if os.path.isdir(MUS):
+# ---- фонова музика: трек, наданий власником проєкту (шлях до mp3 — у змінній MUSIC_SRC).
+# Плавний наростання на початку і згасання в кінці вшиті у файл: кожне коло петлі починається тихо.
+MUSIC_SRC = os.environ.get('MUSIC_SRC')
+if MUSIC_SRC and os.path.isfile(MUSIC_SRC):
     os.makedirs('src/assets/music', exist_ok=True)
-    def mus(args, out):
-        subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y'] + args + ['-ac', '1', '-ar', '22050', '-c:a', 'libvorbis', '-q:a', '0', f'src/assets/music/{out}.ogg'], check=True)
-    mus(['-i', os.path.join(MUS, 'sector_0.mp3'), '-af', 'loudnorm=I=-22,afade=t=in:d=1.5,afade=t=out:st=54:d=2.8'], 'day')
-    mus(['-t', '125', '-i', os.path.join(MUS, 'war%20theme_0.ogg'), '-af', 'loudnorm=I=-21,afade=t=in:d=2,afade=t=out:st=121:d=4'], 'alert')
+    dur = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', MUSIC_SRC], capture_output=True, text=True).stdout)
+    subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', MUSIC_SRC,
+                    '-af', f'loudnorm=I=-20:TP=-2,afade=t=in:d=8:curve=qsin,afade=t=out:st={dur - 6:.2f}:d=6:curve=qsin',
+                    '-ac', '2', '-ar', '32000', '-c:a', 'libvorbis', '-q:a', '0', 'src/assets/music/main.ogg'], check=True)
     for f in sorted(os.listdir('src/assets/music')):
         print(f'music {f:14s} {os.path.getsize("src/assets/music/" + f)/1024:7.1f} KB')
 

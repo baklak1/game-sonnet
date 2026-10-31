@@ -11,19 +11,23 @@ export interface DistrictDef {
   lx: number;      // точка підпису
   ly: number;
   style: 'panel' | 'mixed' | 'historic';
+  /** Тип району: визначає добовий профіль попиту. */
+  type: 'sleep' | 'center' | 'mixed';
+  /** Частка приватного сектору з електроопаленням (чутливість до морозу). */
+  priv: number;
 }
 
 export const DISTRICTS: DistrictDef[] = [
-  { id: 'obolonskyi', name: 'Оболонський', pop: 320, k: 1.0, heat: 'tec6', lx: 340, ly: 138, style: 'panel' },
-  { id: 'podilskyi', name: 'Подільський', pop: 200, k: 1.0, heat: 'tec6', lx: 312, ly: 160, style: 'mixed' },
-  { id: 'shevchenkivskyi', name: 'Шевченківський', pop: 230, k: 1.3, heat: 'tec5', lx: 318, ly: 190, style: 'historic' },
-  { id: 'pecherskyi', name: 'Печерський', pop: 160, k: 1.4, heat: 'tec5', lx: 360, ly: 222, style: 'historic' },
-  { id: 'holosiivskyi', name: 'Голосіївський', pop: 250, k: 1.0, heat: 'tec5', lx: 344, ly: 258, style: 'mixed' },
-  { id: 'solomianskyi', name: "Солом'янський", pop: 380, k: 1.0, heat: 'tec5', lx: 306, ly: 226, style: 'mixed' },
-  { id: 'sviatoshynskyi', name: 'Святошинський', pop: 340, k: 0.95, heat: 'tec5', lx: 248, ly: 196, style: 'panel' },
-  { id: 'desnianskyi', name: 'Деснянський', pop: 360, k: 0.95, heat: 'tec6', lx: 430, ly: 128, style: 'panel' },
-  { id: 'dniprovskyi', name: 'Дніпровський', pop: 350, k: 1.0, heat: 'tec6', lx: 404, ly: 194, style: 'panel' },
-  { id: 'darnytskyi', name: 'Дарницький', pop: 340, k: 1.0, heat: 'darn', lx: 442, ly: 252, style: 'panel' },
+  { id: 'obolonskyi', name: 'Оболонський', pop: 320, k: 1.0, heat: 'tec6', lx: 340, ly: 138, style: 'panel', type: 'sleep', priv: 0.1 },
+  { id: 'podilskyi', name: 'Подільський', pop: 200, k: 1.0, heat: 'tec6', lx: 312, ly: 160, style: 'mixed', type: 'mixed', priv: 0.15 },
+  { id: 'shevchenkivskyi', name: 'Шевченківський', pop: 230, k: 1.3, heat: 'tec5', lx: 318, ly: 190, style: 'historic', type: 'center', priv: 0.03 },
+  { id: 'pecherskyi', name: 'Печерський', pop: 160, k: 1.4, heat: 'tec5', lx: 360, ly: 222, style: 'historic', type: 'center', priv: 0.03 },
+  { id: 'holosiivskyi', name: 'Голосіївський', pop: 250, k: 1.0, heat: 'tec5', lx: 344, ly: 258, style: 'mixed', type: 'mixed', priv: 0.35 },
+  { id: 'solomianskyi', name: "Солом'янський", pop: 380, k: 1.0, heat: 'tec5', lx: 306, ly: 226, style: 'mixed', type: 'mixed', priv: 0.2 },
+  { id: 'sviatoshynskyi', name: 'Святошинський', pop: 340, k: 0.95, heat: 'tec5', lx: 248, ly: 196, style: 'panel', type: 'sleep', priv: 0.25 },
+  { id: 'desnianskyi', name: 'Деснянський', pop: 360, k: 0.95, heat: 'tec6', lx: 430, ly: 128, style: 'panel', type: 'sleep', priv: 0.1 },
+  { id: 'dniprovskyi', name: 'Дніпровський', pop: 350, k: 1.0, heat: 'tec6', lx: 404, ly: 194, style: 'panel', type: 'sleep', priv: 0.08 },
+  { id: 'darnytskyi', name: 'Дарницький', pop: 340, k: 1.0, heat: 'darn', lx: 442, ly: 252, style: 'panel', type: 'sleep', priv: 0.3 },
 ];
 
 export interface ObjDef {

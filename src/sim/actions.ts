@@ -7,7 +7,7 @@ import { crewPeople, makeBuiltObj, makeCrew, makeDefense, newId, objById } from 
 import { needsProject, sendCrew } from './crews';
 import { toast } from './economy';
 import { reloadAll } from './combat';
-import { dispatch, limitMW, plannedMW, updateHeat } from './grid';
+import { dispatch, updateHeat } from './grid';
 
 export interface Res { ok: boolean; msg?: string }
 const OK: Res = { ok: true };
@@ -345,22 +345,6 @@ export function setAllQueues(s: GameState, k: number): Res {
   for (const id of Object.keys(s.schedule.queues)) s.schedule.queues[id] = Math.max(0, Math.min(6, Math.round(k)));
   s.gridDirty = true;
   return OK;
-}
-
-/** Мінімальні однакові черги, щоб укластися в ліміт; пріоритетні райони — на 2 черги менше. */
-export function autoFitSchedule(s: GameState): Res {
-  if ((s.flags.limitUntil ?? 0) <= s.t) return fail('Зараз немає наказу Укренерго — графік не потрібен');
-  s.schedule.mode = 'manual';
-  const lim = limitMW(s);
-  for (let k = 0; k <= 6; k++) {
-    for (const d of s.districts) s.schedule.queues[d.id] = d.priority ? Math.max(0, k - 2) : k;
-    if (plannedMW(s) * 1.05 <= lim) {
-      s.gridDirty = true;
-      return { ok: true, msg: `Графік: ${k} з 6 черг вимкнено` };
-    }
-  }
-  s.gridDirty = true;
-  return { ok: true, msg: 'Навіть 6 черг не вкладаються в ліміт — вимкніть промзони або райони екстрено' };
 }
 
 export function toggleEmergency(s: GameState, id: string): Res {

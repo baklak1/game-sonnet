@@ -1,16 +1,13 @@
 import './ui/styles.css';
 import { App } from './ui/app';
 import { step } from './sim/sim';
+import { loadProgress } from './core/save';
+import { applyFont, loadFont } from './ui/fonts';
 
 async function boot(): Promise<void> {
-  try {
-    await Promise.race([
-      Promise.all([document.fonts.load('12px "Pixelify Sans"', 'ДТЕК СВІТЛО Є'), document.fonts.load('600 12px "Rubik"', 'Світло є ґїєі Kyiv')]),
-      new Promise((r) => setTimeout(r, 1500)),
-    ]);
-  } catch {
-    /* шрифт не обов’язковий */
-  }
+  // шрифт із налаштувань — до побудови інтерфейсу, щоб підписи на мапі одразу були правильні
+  const st = loadProgress().settings;
+  await loadFont(applyFont(st.font, st.fontScale));
   const app = new App();
   (window as unknown as { __app: App }).__app = app;
   (window as unknown as { __sim: unknown }).__sim = { step };

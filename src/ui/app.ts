@@ -18,6 +18,7 @@ import type { AmmoType, CrewType, DefType, Difficulty, FirePolicy, GameState } f
 import * as P from './panels';
 import * as S from './screens';
 import { Tutorial } from './tutorial';
+import { applyFont, fontById, loadFont } from './fonts';
 
 type Mode =
   | { t: 'none' }
@@ -66,6 +67,9 @@ export class App {
       longPress: (x, y) => this.onTap(x, y),
     });
     document.addEventListener('click', (e) => this.onClick(e), true);
+    // повзунки налаштувань: застосовуються під час перетягування, зберігаються після відпускання
+    document.addEventListener('input', (e) => this.onSlider(e, false), true);
+    document.addEventListener('change', (e) => this.onSlider(e, true), true);
     document.addEventListener('pointerdown', () => sfx.unlock(), { once: false, capture: true });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.s) {
@@ -131,13 +135,16 @@ export class App {
     this.cam.cssH = h;
     this.cam.dpr = dpr;
     this.cam.setZoom(this.cam.zoom);
+    this.fitHud();
   }
 
   applySettings(): void {
     const st = this.progress.settings;
-    sfx.enabled = st.sound;
+    sfx.setSfxVolume(st.sfxPct / 100);
     sfx.ambient = st.ambient;
-    sfx.setMusicEnabled(st.music, [0.3, 0.6, 1][st.musicVol - 1] ?? 0.6);
+    sfx.setMusicEnabled(st.musicPct > 0, st.musicPct / 100);
+    applyFont(st.font, st.fontScale);
+    this.r.labelCache.clear();
     this.r.lowFx = st.lowFx;
   }
 
@@ -312,7 +319,54 @@ export class App {
     this.hudBuilt = true;
   }
 
+  private hudFitAt = 0;
+  private hudLen = -1;
+
+  /** Підганяє кегль шапки й підписів тулбара, щоб нічого не обрізалося за будь-якого шрифту й розміру. */
+  fitHud(): void {
+    const tb = document.getElementById('topbar');
+    const st = tb?.querySelector('.stats') as HTMLElement | null;
+    if (tb && st && tb.offsetParent !== null) {
+      const over = () => st.scrollWidth > st.clientWidth + 1 || tb.scrollWidth > tb.clientWidth + 1;
+      const shrink = (min: number) => {
+        let k = 1;
+        tb.style.setProperty('--hudk', '1');
+        while (k > min && over()) {
+          k -= 0.05;
+          tb.style.setProperty('--hudk', k.toFixed(2));
+        }
+      };
+      // спершу зменшуємо кегль; якщо не досить — ховаємо другорядне (температура, смужка попиту)
+      tb.classList.remove('tight');
+      shrink(0.7);
+      if (over()) {
+        tb.classList.add('tight');
+        shrink(0.4);
+      }
+    }
+    const bar = document.getElementById('toolbar');
+    if (bar && bar.offsetParent !== null) {
+      const spans = [...bar.querySelectorAll('button span')] as HTMLElement[];
+      const over = () => spans.some((e) => e.scrollWidth > (e.parentElement as HTMLElement).clientWidth - 2);
+      let q = 1;
+      bar.style.setProperty('--tbk', '1');
+      while (q > 0.5 && over()) {
+        q -= 0.05;
+        bar.style.setProperty('--tbk', q.toFixed(2));
+      }
+    }
+  }
+
   updateHud(_force: boolean): void {
+    // підгонка шапки — коли змінилась довжина тексту (з’явилась цифра) або раз на 1,5 с
+    const now = performance.now();
+    const tb = document.getElementById('topbar');
+    const len = tb && tb.offsetParent !== null ? (tb.textContent ?? '').length : -1;
+    if (len >= 0 && (_force || len !== this.hudLen || now - this.hudFitAt > 1500)) {
+      this.hudFitAt = now;
+      this.hudLen = len;
+      this.fitHud();
+    }
     const s = this.s;
     if (!s) return;
     if (!this.hudBuilt) this.buildHud();
@@ -613,6 +667,21 @@ export class App {
   }
 
   // ---------------- дії
+  onSlider(e: Event, commit: boolean): void {
+    const el = e.target as HTMLInputElement;
+    const key = el.dataset?.set as 'musicPct' | 'sfxPct' | 'fontScale' | undefined;
+    if (!key) return;
+    const v = Number(el.value);
+    this.progress.settings[key] = v;
+    const out = el.nextElementSibling;
+    if (out) out.textContent = v === 0 && key !== 'fontScale' ? 'вимк.' : `${v}%`;
+    sfx.unlock();
+    this.applySettings();
+    if (key === 'sfxPct' && commit) sfx.play('click');
+    if (key === 'fontScale') this.resize();
+    if (commit) saveProgress(this.progress);
+  }
+
   onClick(e: MouseEvent): void {
     const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
     if (!t) return;
@@ -651,10 +720,12 @@ export class App {
         }
         break;
       }
-      case 'musicVol': {
-        this.progress.settings.musicVol = (this.progress.settings.musicVol % 3) + 1;
+      case 'setFont': {
+        this.progress.settings.font = arg;
         saveProgress(this.progress);
         this.applySettings();
+        void loadFont(fontById(arg)).then(() => { this.r.labelCache.clear(); this.resize(); });
+        this.resize();
         if ($('modal').classList.contains('hidden')) this.showScreen('settings', false);
         else this.showPauseMenu();
         break;
@@ -727,7 +798,6 @@ export class App {
       case 'schedMode': if (s) { A.setScheduleMode(s, arg as 'auto' | 'manual'); this.panelTimer = 0; } break;
       case 'schedAll': if (s) { A.setAllQueues(s, Number(arg)); this.panelTimer = 0; } break;
       case 'schedD': if (s) { const [id, dk] = arg.split(':'); A.setDistrictQueues(s, id, (s.schedule.mode === 'manual' ? s.schedule.queues[id] ?? 0 : 0) + Number(dk)); this.panelTimer = 0; } break;
-      case 'schedFit': if (s) { const r = A.autoFitSchedule(s); if (r.msg) s.toasts.push({ text: r.msg, kind: r.ok ? 'info' : 'warn' }); this.panelTimer = 0; } break;
       case 'emerg': if (s) { A.toggleEmergency(s, arg); this.panelTimer = 0; } break;
       case 'indOff': if (s) { A.toggleIndustryOff(s); this.panelTimer = 0; } break;
       case 'selectMetro': this.select({ kind: 'metro', id: arg }); break;
@@ -820,9 +890,7 @@ export class App {
     this.modal(`<h2>Пауза</h2><p>${S.esc(L.title)} · ${DIFF[this.s.difficulty].name}</p>
       <div class="menu-btns">
         <button class="primary" data-act="resume">Продовжити</button>
-        <button class="${st.sound ? 'on' : ''}" data-act="toggleSetting" data-arg="sound">Звук: ${st.sound ? 'увімк.' : 'вимк.'}</button>
-        <button class="${st.music ? 'on' : ''}" data-act="toggleSetting" data-arg="music">Музика: ${st.music ? 'увімк.' : 'вимк.'}</button>
-        <button data-act="musicVol">Гучність музики: ${['тихо', 'середньо', 'гучно'][st.musicVol - 1]}</button>
+        ${S.soundFontControls(st)}
         <button class="${st.autopause ? 'on' : ''}" data-act="toggleSetting" data-arg="autopause">Пауза на тривогу: ${st.autopause ? 'так' : 'ні'}</button>
         <button class="${st.lowFx ? 'on' : ''}" data-act="toggleSetting" data-arg="lowFx">Економія батареї: ${st.lowFx ? 'так' : 'ні'}</button>
         <button data-act="quitToMenu">Зберегти й вийти в меню</button>

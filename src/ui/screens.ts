@@ -2,7 +2,8 @@
 import { LEVELS, ENDLESS, type LevelDef } from '../data/levels';
 import { DIFF } from '../data/balance';
 import { THREATS } from '../data/specs';
-import type { Progress } from '../core/save';
+import type { Progress, Settings } from '../core/save';
+import { FONTS } from './fonts';
 import type { Difficulty, GameState } from '../sim/types';
 import { avgServed } from '../sim/objectives';
 
@@ -29,7 +30,7 @@ export function mainMenu(hasRun: boolean, runLabel: string): string {
       <button data-act="settings">Налаштування</button>
       <button data-act="about">Про гру</button>
     </div>
-    <p style="text-align:center;color:var(--ink3);font-size:11px;margin:4px 0 0">Неофіційна фан-гра. Не пов’язана з ДТЕК, Укренерго чи іншими компаніями.</p>
+    <p style="text-align:center;color:var(--ink3);font-size:calc(12px * var(--fs));margin:4px 0 0">Неофіційна фан-гра. Не пов’язана з ДТЕК, Укренерго чи іншими компаніями.</p>
   </div>`;
 }
 
@@ -57,7 +58,7 @@ export function briefing(L: LevelDef, chosen: Difficulty): string {
       <p><span class="tag">Загрози: ${esc(threats)}</span> <span class="tag">${L.season === 'winter' ? 'Зима' : L.season === 'summer' ? 'Літо' : L.season === 'spring' ? 'Весна' : 'Осінь'}</span></p>
     </div>
     <div class="diff">${DIFFS.map((d) => `<button class="${d === chosen ? 'on' : ''}" data-act="diff" data-arg="${d}"><b>${DIFF[d].name}</b><small>${DIFF_DESC[d]}</small></button>`).join('')}</div>
-    <button class="primary" style="min-height:48px;font-size:16px" data-act="start" data-arg="${L.id}">Почати</button>
+    <button class="primary" style="min-height:48px;font-size:calc(16px * var(--fs))" data-act="start" data-arg="${L.id}">Почати</button>
   </div>`;
 }
 
@@ -77,6 +78,14 @@ export function howTo(): string {
     <p>Удень бригади ремонтують, ви будуєте й закуповуєте. О 21:00 у дні атаки лунає сирена: шахеди летять кілька годин, на світанку — крилаті ракети й балістика.</p>
     <h2>Місто</h2>
     <p>Метро (три лінії) живиться від районів, через які проходить: якщо район без світла — поїзди на цій ділянці стоять, кияни злі. Промзони платять за світло дорожче, але в дефіцит їх гасять першими (пріоритет можна змінити в «Мережі»). За містом можна ставити вітряки — їх треба з’єднати ЛЕП з підстанцією.</p>
+    <h2>Райони їдять по-різному</h2>
+    <ul>
+      <li><b>Спальні</b> (Оболонь, Троєщина, Дарниця, Борщагівка, Лівобережна): удень порожньо, пік уранці й особливо ввечері, 19–22.</li>
+      <li><b>Діловий центр</b> (Печерськ, Шевченківський): офіси й уряд, пік з 9 до 18, уночі тихо, влітку кондиціонери. Мешканців менше, а бізнес платить дорожче — світло тут вигідніше.</li>
+      <li><b>Змішані</b> (Поділ, Солом’янка, Голосіїв): рівніший попит протягом доби.</li>
+      <li>Приватний сектор з електроопаленням (Голосіїв, Дарниця, Святошин) у мороз їсть помітно більше. У вихідні центр затихає, спальні райони споживають більше.</li>
+      <li>Профіль доби кожного району видно в його панелі.</li>
+    </ul>
     <h2>Енергосистема</h2>
     <ul>
       <li>ТЕЦ, ГЕС, ГАЕС, Трипільська ТЕС та імпорт з АЕС через ПС 750 «Київська» живлять кільце 330 кВ.</li>
@@ -86,7 +95,7 @@ export function howTo(): string {
       <li>Локальна генерація (КГУ, ГТУ, СЕС, батареї) живить свій район, навіть коли його відрізано від кільця.</li>
     </ul>
     <h2>Графіки та екстрені відключення</h2>
-    <p>Укренерго надсилає наказ: «Київ споживає не більше N МВт до такої-то години». У вкладці «Графіки» можна лишити автомат або скласти ручний графік: однаково для всього Києва або окремо для кожного району (0–6 черг з 6). Якщо графік не вкладається в ліміт, Укренерго саме застосує аварійні відключення і штраф. Кнопка ⚡ екстрено вимикає район: потужність одразу йде іншим районам, метро й водоканалу, але кияни злі.</p>
+    <p>Укренерго надсилає наказ: «Київ споживає не більше N МВт до такої-то години». У вкладці «Графіки» можна лишити автомат або скласти ручний графік: однаково для всього Києва або окремо для кожного району (0–6 черг з 6). Панель показує, на скільки МВт ви перевищуєте ліміт або скільки лишилося запасу, — черги підбираєте самі, з огляду на те, який район зараз їсть найбільше. Якщо графік не вкладається в ліміт, Укренерго саме застосує аварійні відключення і штраф. Наказ закінчився — ручний графік знімається. Кнопка ⚡ екстрено вимикає район: потужність одразу йде іншим районам, метро й водоканалу, але кияни злі.</p>
     <h2>Оборона</h2>
     <ul>
       <li>МВГ і «Гепарди» — дешево проти шахедів. ЗРК (NASAMS, IRIS-T, Patriot) — дорогі ракети, бережіть їх для ракет.</li>
@@ -115,18 +124,31 @@ export function about(): string {
     <p>Мапа: райони, вулиці, шосе, залізниці, станції метро, вода, парки й промзони — © OpenStreetMap contributors (ODbL), вивантаження BBBike.org.</p>
     <p>Звуки — OpenGameArt.org, CC0: сирена «storm siren» (TinyWorlds), «Synthesized explosion» (qubodup), пакети «50 CC0 Sci-Fi SFX», «100 CC0 SFX», «25 CC0 bang / firework SFX» (rubberduck), «Motor Sound Effect» (EZduzziteh).</p>
     <p>Сміттєспалювальний завод «Енергія», промзони й метро — реальні об’єкти; їхні параметри в грі округлені й умовні.</p>
-    <p>Шрифти: Rubik © The Rubik Project Authors, Pixelify Sans © The Pixelify Sans Project Authors — SIL Open Font License 1.1.</p>
-    <p>Музика (CC0, OpenGameArt): «sector» з Dark Sci-Fi Audio Pack (Ball Logic), «War Theme» (Spring Spring).</p>
+    <p>Шрифти (SIL Open Font License 1.1): Tiny5, Press Start 2P, Handjet, Pixelify Sans, JetBrains Mono, Rubik — © їхні автори.</p>
+    <p>Музика: трек, наданий автором збірки.</p>
     <p>Слава енергетикам, рятувальникам і ППО.</p>
   </div></div>`;
 }
 
+/** Повзунок налаштування; значення застосовується одразу під час перетягування. */
+function slider(key: 'musicPct' | 'sfxPct' | 'fontScale', label: string, v: number, min: number, max: number, step: number): string {
+  return `<label class="slider"><span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${v}" data-set="${key}"><b>${v === 0 && key !== 'fontScale' ? 'вимк.' : `${v}%`}</b></label>`;
+}
+
+/** Звук і шрифт — спільний блок для екрана налаштувань і меню паузи. */
+export function soundFontControls(st: Settings): string {
+  return `${slider('musicPct', 'Музика', st.musicPct, 0, 100, 5)}${slider('sfxPct', 'Звуки', st.sfxPct, 0, 100, 5)}
+    <div class="fontpick"><span class="k">Шрифт</span>${FONTS.map((f) => `<button class="${st.font === f.id ? 'on' : ''}" data-act="setFont" data-arg="${f.id}" style="font-family:${f.family.replace(/"/g, "'")}, sans-serif;font-size:calc(${Math.round(16 * f.k)}px * var(--fs) / ${FONTS.find((x) => x.id === st.font)?.k ?? 1})">${f.name}</button>`).join('')}</div>
+    ${slider('fontScale', 'Розмір шрифту', st.fontScale, 70, 150, 5)}`;
+}
+
 export function settingsMenu(p: Progress): string {
-  const t = (key: 'autopause' | 'music' | 'sound' | 'ambient' | 'vibro' | 'lowFx', label: string) =>
+  const t = (key: 'autopause' | 'ambient' | 'vibro' | 'lowFx', label: string) =>
     `<button class="${p.settings[key] ? 'on' : ''}" data-act="toggleSetting" data-arg="${key}">${label}: ${p.settings[key] ? 'увімк.' : 'вимк.'}</button>`;
   return `<div class="menu"><div class="topline"><button data-act="back">←</button><h1>Налаштування</h1></div>
   <div class="panel-box pix"><div class="menu-btns">
-    ${t('autopause', 'Пауза на початку тривоги')}${t('music', 'Музика')}<button data-act="musicVol">Гучність музики: ${['тихо', 'середньо', 'гучно'][p.settings.musicVol - 1]}</button>${t('sound', 'Звук')}${t('ambient', 'Гул генераторів у темряві')}${t('vibro', 'Вібрація')}${t('lowFx', 'Економія батареї')}
+    ${soundFontControls(p.settings)}
+    ${t('autopause', 'Пауза на початку тривоги')}${t('ambient', 'Гул генераторів у темряві')}${t('vibro', 'Вібрація')}${t('lowFx', 'Економія батареї')}
     <button class="danger" data-act="resetAll">Скинути прогрес</button>
   </div></div></div>`;
 }
@@ -134,10 +156,10 @@ export function settingsMenu(p: Progress): string {
 export function results(s: GameState, L: LevelDef, nextId: string | null): string {
   const o = s.over!;
   const down = Object.entries(s.stats.downed).map(([k, v]) => `${THREATS[k as keyof typeof THREATS]?.short ?? k}: ${v}`).join(', ') || '—';
-  const st = o.win ? `<div class="stars" style="font-size:30px;color:var(--acc);text-align:center">${'★'.repeat(o.stars)}${'☆'.repeat(3 - o.stars)}</div>` : '';
+  const st = o.win ? `<div class="stars" style="font-size:calc(32px * var(--fs));color:var(--acc);text-align:center">${'★'.repeat(o.stars)}${'☆'.repeat(3 - o.stars)}</div>` : '';
   const isEndless = s.mode === 'endless';
   return `<div class="menu">
-    <div class="logo"><div class="a" style="font-size:30px;color:${o.win || isEndless ? 'var(--acc)' : 'var(--bad)'}">${isEndless ? 'Оборону завершено' : o.win ? 'Світло втримано!' : 'Поразка'}</div></div>
+    <div class="logo"><div class="a" style="font-size:calc(32px * var(--fs));color:${o.win || isEndless ? 'var(--acc)' : 'var(--bad)'}">${isEndless ? 'Оборону завершено' : o.win ? 'Світло втримано!' : 'Поразка'}</div></div>
     ${st}
     <div class="panel-box pix">
       <p>${esc(o.reason)}</p>

@@ -1,7 +1,7 @@
 // Гроші, довіра, критичні споживачі, блекаут. Тік — кожен крок, підсумки — щогодини та щодня.
 import { B, DIFF } from '../data/balance';
 import { CREWS, DEFS } from '../data/specs';
-import { isHeatingSeason } from './demand';
+import { districtRevenueK, isHeatingSeason } from './demand';
 import { limitMW, metroFactor as metroFactorNow, plannedMW } from './grid';
 import type { GameState } from './types';
 import { crewPeople } from './init';
@@ -32,7 +32,11 @@ export function collection(s: GameState): number {
 export function economyTick(s: GameState, dtMin: number): void {
   const h = dtMin / 60;
   const D = DIFF[s.difficulty];
-  const homes = Math.max(0, s.servedTotal - s.industryServed);
+  // побут і бізнес районів: у діловому центрі більше комерційних споживачів, які платять дорожче
+  let homes = 0, distServed = 0;
+  for (const d of s.districts) { homes += d.served * districtRevenueK(d.id); distServed += d.served; }
+  // водоканал, метро та інші критичні споживачі платять за звичайним тарифом
+  homes += Math.max(0, s.servedTotal - s.industryServed - distServed);
   const revenue = (homes * collection(s) + s.industryServed * B.businessTariff) * h * B.tariff * D.income;
   let fuel = 0;
   for (const o of s.objs) {
